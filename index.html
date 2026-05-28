@@ -130,6 +130,14 @@ input,select{font-family:inherit;}
         Avatar → API Keys → copiez la Master Key
       </div>
       <input class="setup-inp" type="password" id="setup-key" placeholder="$2a$10$xxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="setup-step">
+      <div style="font-size:13px;font-weight:700;color:#0F172A;display:flex;align-items:center;gap:8px">
+        <span style="width:22px;height:22px;border-radius:50%;background:#0EA5E9;color:#fff;font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">3</span>
+        Bin ID existant ? <span style="font-weight:400;color:#94A3B8;font-size:11px">(optionnel — pour synchroniser avec un autre appareil)</span>
+      </div>
+      <input class="setup-inp" type="text" id="setup-binid" placeholder="Laisser vide si premier appareil" autocomplete="off" spellcheck="false" style="font-family:monospace;font-size:13px">
+      <div style="font-size:11px;color:#64748B;margin-top:6px">📍 Trouvez le Bin ID dans ⚙️ Paramètres sur votre autre appareil</div>
       <div id="setup-err" style="color:#DC2626;font-size:12px;margin-top:6px;display:none"></div>
     </div>
     <button class="setup-btn" onclick="doSetup()">✅ Démarrer l'application</button>
@@ -222,17 +230,30 @@ function setSyncDot(st){
 // ══════════════════════════════════════════════════
 async function doSetup(){
   const key=document.getElementById('setup-key').value.trim();
+  const binInput=(document.getElementById('setup-binid').value||'').trim();
   const err=document.getElementById('setup-err');err.style.display='none';
   if(!key.startsWith('$2a$')){err.textContent='❌ La clé doit commencer par $2a$…';err.style.display='block';return;}
   const btn=document.querySelector('.setup-btn');btn.textContent='⏳ Connexion…';btn.disabled=true;
   try{
-    API_KEY=key;BIN_ID=await createBin(key);
+    API_KEY=key;
+    if(binInput){
+      // Utiliser un bin existant
+      BIN_ID=binInput;
+      const d=await loadBin();
+      if(d.emps)STATE.emps=d.emps.map(e=>({...e,postes:e.postes||(e.poste?[e.poste]:[]),heures:e.heures||e.heuresContrat||35}));
+      if(d.fc)STATE.fc=d.fc;
+      if(d.plan)STATE.plan=d.plan;
+      if(d.par)STATE.par=d.par;
+    } else {
+      // Créer un nouveau bin
+      BIN_ID=await createBin(key);
+    }
     localStorage.setItem('mb_key',key);localStorage.setItem('mb_bin',BIN_ID);
     document.getElementById('setup').style.display='none';
     document.getElementById('app').style.display='flex';
     render();
   }catch(e){
-    err.textContent='❌ Clé invalide ou erreur réseau.';err.style.display='block';
+    err.textContent='❌ Clé invalide, Bin ID introuvable ou erreur réseau.';err.style.display='block';
     btn.textContent='✅ Démarrer';btn.disabled=false;
   }
 }

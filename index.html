@@ -36,13 +36,13 @@ input,select{font-family:inherit;}
 .tl-emp-col{flex-shrink:0;display:flex;align-items:center;padding:6px 10px;font-size:11px;color:#64748B;font-weight:600;position:sticky;left:0;background:#F8FAFC;z-index:11;border-right:1px solid #E2E8F0;}
 .tl-hours{position:relative;height:32px;flex-shrink:0;}
 .emp-row{display:flex;border-bottom:1px solid #F1F5F9;}
-.emp-label{flex-shrink:0;padding:6px 8px 6px 10px;position:sticky;left:0;background:#fff;z-index:5;border-right:1px solid #F1F5F9;display:flex;align-items:center;gap:5px;}
+.emp-label{flex-shrink:0;padding:6px 8px 6px 10px;position:sticky;left:0;background:#fff;z-index:5;border-right:1px solid #F1F5F9;display:flex;flex-direction:column;justify-content:center;gap:4px;}
 .track{position:relative;flex-shrink:0;cursor:crosshair;touch-action:pan-y;}
-.shift-block{position:absolute;top:5px;border-radius:8px;display:flex;align-items:center;box-shadow:0 1px 6px rgba(0,0,0,.1);z-index:2;overflow:visible;}
+.shift-block{position:absolute;border-radius:8px;display:flex;align-items:center;box-shadow:0 1px 6px rgba(0,0,0,.12);z-index:2;overflow:visible;}
+.shift-block:hover{box-shadow:0 2px 10px rgba(0,0,0,.2);}
 .sh-handle{position:absolute;top:0;bottom:0;width:10px;display:flex;align-items:center;justify-content:center;cursor:ew-resize;z-index:3;touch-action:none;}
 .sh-drag{flex:1;cursor:grab;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;padding:0 12px;touch-action:none;user-select:none;}
-.poste-pill{display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:10px;font-size:9px;font-weight:700;cursor:pointer;white-space:nowrap;border:1px solid transparent;transition:all .1s;}
-.poste-pill:hover{opacity:.8;}
+.poste-pill{display:inline-flex;align-items:center;gap:3px;padding:1px 5px;border-radius:8px;font-size:8px;font-weight:700;cursor:pointer;white-space:nowrap;border:1px solid transparent;}
 .need-badge{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;}
 .card{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);border:1px solid #E2E8F0;overflow:hidden;margin-bottom:12px;}
 .poste-hdr-row{padding:6px 14px;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px;}
@@ -69,19 +69,16 @@ input,select{font-family:inherit;}
 .setup-inp{width:100%;padding:11px 14px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;color:#0F172A;outline:none;margin-top:8px;}
 .setup-inp:focus{border-color:#0EA5E9;}
 .setup-btn{width:100%;padding:13px;border:none;border-radius:12px;background:linear-gradient(135deg,#0EA5E9,#0284C7);color:#fff;font-size:15px;font-weight:800;cursor:pointer;margin-top:6px;}
-
-/* ── EXPORT STYLES ── */
+/* Export */
 .exp-emp-card{background:#fff;border-radius:10px;border:1px solid #E2E8F0;margin-bottom:14px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);}
 .exp-emp-hdr{padding:10px 14px;display:flex;align-items:center;gap:10px;}
 .exp-week-grid{display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid #E2E8F0;}
-.exp-day-cell{padding:8px 6px;border-right:1px solid #F1F5F9;min-height:70px;}
+.exp-day-cell{padding:7px 5px;border-right:1px solid #F1F5F9;min-height:70px;}
 .exp-day-cell:last-child{border-right:none;}
-.exp-day-hdr{font-size:10px;font-weight:600;color:#64748B;text-transform:capitalize;margin-bottom:5px;text-align:center;}
+.exp-day-hdr{font-size:10px;font-weight:600;color:#64748B;text-transform:capitalize;margin-bottom:4px;text-align:center;}
 .exp-day-hdr.we{color:#DC2626;}
-.exp-shift-info{text-align:center;}
-
-/* ── PRINT STYLES ── */
-@media print {
+/* Print */
+@media print{
   body{overflow:visible !important;height:auto !important;}
   #app .hdr,#app .nav,#app .main{display:none !important;}
   #print-area{display:block !important;}
@@ -95,9 +92,10 @@ input,select{font-family:inherit;}
   .print-day-name{font-size:11px;font-weight:700;color:#374151;text-transform:capitalize;margin-bottom:4px;text-align:center;}
   .print-day-name.we{color:#DC2626;}
   .print-day-off{font-size:11px;color:#CBD5E1;text-align:center;padding-top:8px;}
-  .print-shift-time{font-size:14px;font-weight:800;color:#0369A1;text-align:center;line-height:1.3;}
-  .print-shift-dur{font-size:11px;color:#64748B;text-align:center;margin-top:2px;}
-  .print-shift-poste{font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;display:inline-block;margin-top:4px;}
+  .print-shift{margin-bottom:5px;padding:4px;border-radius:4px;text-align:center;}
+  .print-shift-time{font-size:13px;font-weight:800;color:#0369A1;}
+  .print-shift-dur{font-size:10px;color:#64748B;}
+  .print-shift-poste{font-size:9px;font-weight:700;padding:1px 5px;border-radius:6px;display:inline-block;margin-top:2px;}
   .print-total{margin-top:12px;padding:8px 12px;background:#F0F9FF;border-radius:6px;font-size:12px;color:#0369A1;font-weight:600;}
   .print-signature{margin-top:20px;display:flex;justify-content:space-between;}
   .print-sig-box{border-top:1px solid #374151;padding-top:6px;font-size:10px;color:#64748B;width:45%;}
@@ -127,17 +125,17 @@ input,select{font-family:inherit;}
     <div class="setup-step">
       <div style="font-size:13px;font-weight:700;color:#0F172A;display:flex;align-items:center;gap:8px">
         <span style="width:22px;height:22px;border-radius:50%;background:#0EA5E9;color:#fff;font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">2</span>
-        Avatar → API Keys → copiez la Master Key
+        Avatar → API Keys → Master Key
       </div>
       <input class="setup-inp" type="password" id="setup-key" placeholder="$2a$10$xxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false">
     </div>
     <div class="setup-step">
       <div style="font-size:13px;font-weight:700;color:#0F172A;display:flex;align-items:center;gap:8px">
         <span style="width:22px;height:22px;border-radius:50%;background:#0EA5E9;color:#fff;font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">3</span>
-        Bin ID existant ? <span style="font-weight:400;color:#94A3B8;font-size:11px">(optionnel — pour synchroniser avec un autre appareil)</span>
+        Bin ID existant ? <span style="font-weight:400;color:#94A3B8;font-size:11px">(laisser vide si 1er appareil)</span>
       </div>
-      <input class="setup-inp" type="text" id="setup-binid" placeholder="Laisser vide si premier appareil" autocomplete="off" spellcheck="false" style="font-family:monospace;font-size:13px">
-      <div style="font-size:11px;color:#64748B;margin-top:6px">📍 Trouvez le Bin ID dans ⚙️ Paramètres sur votre autre appareil</div>
+      <input class="setup-inp" type="text" id="setup-binid" placeholder="Optionnel — pour synchroniser" autocomplete="off" spellcheck="false" style="font-size:13px">
+      <div style="font-size:11px;color:#64748B;margin-top:5px">📍 Trouvez le Bin ID dans ⚙️ Paramètres sur votre autre appareil</div>
       <div id="setup-err" style="color:#DC2626;font-size:12px;margin-top:6px;display:none"></div>
     </div>
     <button class="setup-btn" onclick="doSetup()">✅ Démarrer l'application</button>
@@ -148,7 +146,7 @@ input,select{font-family:inherit;}
   <div class="hdr">
     <div style="width:36px;height:36px;border-radius:9px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🫙</div>
     <div style="flex:1"><div style="font-weight:800;font-size:16px">La Marmite Bleue</div><div style="font-size:10px;opacity:.75;letter-spacing:.8px">PLANIFICATION DU PERSONNEL</div></div>
-    <div id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:#4ADE80;transition:background .3s" title="Synchronisé"></div>
+    <div id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:#4ADE80;transition:background .3s"></div>
     <button onclick="confirmReset()" style="background:rgba(255,255,255,.15);border:none;padding:6px 10px;border-radius:7px;color:#fff;font-size:11px;margin-left:8px">⚙️</button>
   </div>
   <nav class="nav">
@@ -165,15 +163,13 @@ input,select{font-family:inherit;}
   </div>
 </div>
 
-<!-- Zone d'impression (cachée à l'écran) -->
 <div id="print-area" style="display:none"></div>
-
 <div id="modal-root"></div>
 
 <script>
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // CONSTANTES
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 const POSTES=['Serveur/Serveuse','Cuisinier','Plongeur','Caisse/Accueil','Bar'];
 const PS={
   'Serveur/Serveuse':{bg:'#EFF6FF',bd:'#BFDBFE',tx:'#1E40AF',dot:'#3B82F6'},
@@ -184,16 +180,19 @@ const PS={
 };
 const PX_MIN=2,TL_S=4*60,TL_E=24*60,SLOT=15,MIN_D=120;
 const TL_W=(TL_E-TL_S)*PX_MIN;
-const EC_W=130,ROW_H=60;
+const EC_W=130;
+// Hauteur de ligne adaptée aux créneaux multiples
+const ROW_H_BASE=58, ROW_H_EXTRA=52; // px par créneau supplémentaire
+const BASE='https://api.jsonbin.io/v3';
 const AUTO_SL=[
   {s:11*60+30,e:17*60+30},{s:17*60,e:23*60},{s:11*60+30,e:23*60},
   {s:12*60,e:18*60},{s:18*60,e:22*60},{s:14*60,e:20*60},
 ];
-const BASE='https://api.jsonbin.io/v3';
 
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // STATE
-// ══════════════════════════════════════════════════
+// plan[dk][empId] = [ {s, e, poste}, {s, e, poste}, ... ]
+// ═══════════════════════════════════════════════════
 let STATE={emps:[],fc:{},plan:{},par:{ratioSrv:35,ratioCui:60,minCui:1,seuilPlo:50,seuilBar:1500}};
 let MON=getMonday(new Date());
 let SEL_DAY=toISO(new Date());
@@ -201,9 +200,9 @@ let API_KEY='',BIN_ID='';
 let saveTimer=null,curTab='planning';
 let DRAG=null;
 
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // JSONBIN
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 async function createBin(key){
   const r=await fetch(`${BASE}/b`,{method:'POST',headers:{'Content-Type':'application/json','X-Master-Key':key,'X-Bin-Name':'marmite-planning'},body:JSON.stringify(STATE)});
   if(!r.ok)throw new Error();
@@ -225,9 +224,9 @@ function setSyncDot(st){
   d.style.background=st==='ok'?'#4ADE80':st==='syncing'?'#FCD34D':'#F87171';
 }
 
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // SETUP & INIT
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 async function doSetup(){
   const key=document.getElementById('setup-key').value.trim();
   const binInput=(document.getElementById('setup-binid').value||'').trim();
@@ -237,15 +236,10 @@ async function doSetup(){
   try{
     API_KEY=key;
     if(binInput){
-      // Utiliser un bin existant
       BIN_ID=binInput;
       const d=await loadBin();
-      if(d.emps)STATE.emps=d.emps.map(e=>({...e,postes:e.postes||(e.poste?[e.poste]:[]),heures:e.heures||e.heuresContrat||35}));
-      if(d.fc)STATE.fc=d.fc;
-      if(d.plan)STATE.plan=d.plan;
-      if(d.par)STATE.par=d.par;
+      applyLoadedData(d);
     } else {
-      // Créer un nouveau bin
       BIN_ID=await createBin(key);
     }
     localStorage.setItem('mb_key',key);localStorage.setItem('mb_bin',BIN_ID);
@@ -257,18 +251,33 @@ async function doSetup(){
     btn.textContent='✅ Démarrer';btn.disabled=false;
   }
 }
+
+function applyLoadedData(d){
+  if(d.emps)STATE.emps=d.emps.map(e=>({...e,postes:e.postes||(e.poste?[e.poste]:[]),heures:e.heures||e.heuresContrat||35}));
+  if(d.fc)STATE.fc=d.fc;
+  if(d.par)STATE.par=d.par;
+  // Migration : ancien format {s,e,poste} → [{s,e,poste}]
+  if(d.plan){
+    const np={};
+    Object.keys(d.plan).forEach(dk=>{
+      np[dk]={};
+      Object.keys(d.plan[dk]).forEach(eid=>{
+        const v=d.plan[dk][eid];
+        if(Array.isArray(v)){np[dk][eid]=v;}
+        else if(v&&v.s!==undefined){np[dk][eid]=[v];}
+        else{np[dk][eid]=[];}
+      });
+    });
+    STATE.plan=np;
+  }
+}
+
 async function init(){
   if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
   const key=localStorage.getItem('mb_key'),bid=localStorage.getItem('mb_bin');
   if(!key||!bid){document.getElementById('loading').style.display='none';document.getElementById('setup').style.display='flex';return;}
   API_KEY=key;BIN_ID=bid;
-  try{
-    const d=await loadBin();
-    if(d.emps)STATE.emps=d.emps.map(e=>({...e,postes:e.postes||(e.poste?[e.poste]:[]),heures:e.heures||e.heuresContrat||35}));
-    if(d.fc)STATE.fc=d.fc;
-    if(d.plan)STATE.plan=d.plan;
-    if(d.par)STATE.par=d.par;
-  }catch(e){setSyncDot('error');}
+  try{applyLoadedData(await loadBin());}catch(e){setSyncDot('error');}
   document.getElementById('loading').style.display='none';
   document.getElementById('app').style.display='flex';
   const days=getDays();
@@ -281,14 +290,13 @@ function confirmReset(){
   {localStorage.removeItem('mb_key');localStorage.removeItem('mb_bin');location.reload();}
 }
 
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // HELPERS
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 function getMonday(d){const r=new Date(d);r.setHours(0,0,0,0);r.setDate(r.getDate()-((r.getDay()||7)-1));return r;}
 function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
 function toISO(d){return d.toISOString().split('T')[0];}
 function fDay(d){return d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric'});}
-function fDayFull(d){return d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});}
 function fMon(d){return d.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});}
 function fWk(m){const s=addDays(m,6);return m.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+' – '+s.toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});}
 function isWE(d){return d.getDay()===0||d.getDay()===6;}
@@ -303,18 +311,110 @@ function fTime(min){const h=Math.floor(min/60)%24,m=min%60;return h+'h'+(m>0?Str
 function fDur(min){const h=Math.floor(min/60),m=min%60;if(h===0)return m+'min';return m>0?h+'h'+String(m).padStart(2,'0'):h+'h';}
 function empHasPoste(e,p){return(e.postes||[]).includes(p);}
 function mainPoste(e){return(e.postes||[])[0]||POSTES[0];}
-function wkHrs(id){return getDays().reduce((s,d)=>{const sh=(STATE.plan[toISO(d)]||{})[id];return s+(sh&&sh.s!==undefined?(sh.e-sh.s)/60:0);},0);}
+
+// Shifts d'un employé un jour donné (toujours un tableau)
+function getShifts(dk,eid){
+  const v=(STATE.plan[dk]||{})[eid];
+  if(!v)return[];
+  return Array.isArray(v)?v:[v];
+}
+
+// Total minutes travaillées dans la semaine
+function wkHrs(eid){
+  return getDays().reduce((s,d)=>{
+    return s+getShifts(toISO(d),eid).reduce((ss,sh)=>ss+(sh.e-sh.s),0);
+  },0)/60;
+}
+
+// Total minutes travaillées dans la journée
+function dayMin(dk,eid){
+  return getShifts(dk,eid).reduce((s,sh)=>s+(sh.e-sh.s),0);
+}
+
 function calcNeeds(cov,ca,p){
   const c=+cov||0,r=+ca||0;
   if(!c&&!r)return Object.fromEntries(POSTES.map(x=>[x,0]));
   return{'Serveur/Serveuse':Math.max(1,Math.ceil(c/p.ratioSrv)),'Cuisinier':Math.max(p.minCui,Math.ceil(c/p.ratioCui)),'Plongeur':c>=p.seuilPlo?1:0,'Caisse/Accueil':c>0?1:0,'Bar':r>=p.seuilBar?1:0};
 }
 
-// ══════════════════════════════════════════════════
+// Hauteur de la ligne selon le nombre de créneaux
+function rowH(dk,eid){
+  const n=getShifts(dk,eid).length;
+  return ROW_H_BASE + Math.max(0,n-1)*ROW_H_EXTRA;
+}
+// Position verticale du créneau idx
+function slotTop(idx){return 5+idx*ROW_H_EXTRA;}
+function slotBot(idx,total,rh){return rh-5-(total-1-idx)*ROW_H_EXTRA;}
+
+// ═══════════════════════════════════════════════════
+// MUTATIONS
+// ═══════════════════════════════════════════════════
+function setShifts(dk,eid,arr){
+  if(!STATE.plan[dk])STATE.plan[dk]={};
+  STATE.plan[dk][eid]=arr.filter(sh=>sh&&sh.s!==undefined);
+  scheduleSave();
+}
+
+function addShift(eid,dk){
+  const existing=getShifts(dk,eid);
+  // Propose un créneau après le dernier existant
+  let ns=19*60,ne=23*60;
+  if(existing.length){
+    const last=existing.reduce((a,b)=>b.e>a.e?b:a);
+    ns=snap(Math.min(last.e+60,TL_E-MIN_D));
+    ne=Math.min(ns+MIN_D,TL_E);
+  }
+  const emp=STATE.emps.find(e=>e.id===eid);
+  setShifts(dk,eid,[...existing,{s:ns,e:ne,poste:mainPoste(emp||{})}]);
+  renderPlanning();
+}
+
+function deleteShift(eid,dk,idx){
+  const arr=getShifts(dk,eid).filter((_,i)=>i!==idx);
+  setShifts(dk,eid,arr);
+  renderPlanning();
+}
+
+function createFirstShift(eid,dk){
+  const emp=STATE.emps.find(e=>e.id===eid);
+  setShifts(dk,eid,[{s:11*60+30,e:17*60+30,poste:mainPoste(emp||{})}]);
+  renderPlanning();
+}
+
+function cyclePoste(eid,dk,idx){
+  const arr=getShifts(dk,eid);if(!arr[idx])return;
+  const emp=STATE.emps.find(e=>e.id===eid);if(!emp)return;
+  const postes=emp.postes||[mainPoste(emp)];
+  const cur=arr[idx].poste||postes[0];
+  const next=postes[(postes.indexOf(cur)+1)%postes.length];
+  arr[idx].poste=next;
+  setShifts(dk,eid,arr);
+  // Mise à jour directe du badge sans re-render
+  const badge=document.getElementById(`pb-${eid}-${idx}`);
+  if(badge){
+    const ps=PS[next]||PS[POSTES[0]];
+    badge.style.background=ps.bd;badge.style.color=ps.tx;
+    badge.textContent=next.split('/')[0];
+    badge.title='Poste : '+next+' (cliquer pour changer)';
+  }
+}
+
+function onTrackClick(e,eid,dk){
+  if(e.target.closest('.shift-block')||e.target.closest('.sh-handle')||e.target.closest('.sh-drag'))return;
+  const rect=e.currentTarget.getBoundingClientRect();
+  const localX=(e.touches?e.touches[0].clientX:e.clientX)-rect.left;
+  const clickMin=snap(clamp(l2m(localX),TL_S,TL_E-MIN_D));
+  const emp=STATE.emps.find(x=>x.id===eid);
+  const existing=getShifts(dk,eid);
+  setShifts(dk,eid,[...existing,{s:clickMin,e:clamp(clickMin+MIN_D,TL_S+MIN_D,TL_E),poste:mainPoste(emp||{})}]);
+  renderPlanning();
+}
+
+// ═══════════════════════════════════════════════════
 // AUTO-GEN
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 function autoGen(){
-  const days=getDays(),np={...STATE.plan};
+  const days=getDays(),np={};
   days.forEach(d=>{np[toISO(d)]={};});
   const empD=Object.fromEntries(STATE.emps.map(e=>[e.id,0]));
   const empT=Object.fromEntries(STATE.emps.map(e=>[e.id,Math.max(1,Math.round(e.heures/6))]));
@@ -324,23 +424,25 @@ function autoGen(){
     const needs=calcNeeds(f.couverts,f.ca,STATE.par);
     POSTES.forEach(poste=>{
       const need=needs[poste];if(!need)return;
-      const cands=STATE.emps.filter(e=>empHasPoste(e,poste)&&!np[key][e.id]&&empD[e.id]<empT[e.id])
+      const cands=STATE.emps.filter(e=>empHasPoste(e,poste)&&!np[key][e.id]?.length&&empD[e.id]<empT[e.id])
         .sort((a,b)=>(empT[b.id]-empD[b.id])-(empT[a.id]-empD[a.id]));
       let si=0,assigned=0;
       for(const emp of cands){
         if(assigned>=need)break;
         const sl=AUTO_SL[si%AUTO_SL.length];
-        np[key][emp.id]={s:sl.s,e:sl.e,poste:poste};
+        np[key][emp.id]=[{s:sl.s,e:sl.e,poste:poste}];
         empD[emp.id]++;assigned++;si++;
       }
     });
   }
-  STATE.plan=np;scheduleSave();renderPlanning();
+  // Garder les jours hors de la semaine sélectionnée
+  days.forEach(d=>{STATE.plan[toISO(d)]=np[toISO(d)];});
+  scheduleSave();renderPlanning();
 }
 
-// ══════════════════════════════════════════════════
-// DRAG & DROP
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
+// DRAG & DROP — identifié par (eid, idx)
+// ═══════════════════════════════════════════════════
 function initDrag(){
   document.addEventListener('mousemove',onDragMove);
   document.addEventListener('mouseup',onDragEnd);
@@ -358,7 +460,7 @@ function onDragMove(e){
   else if(DRAG.type==='left'){ns=snap(clamp(DRAG.oS+dm,TL_S,DRAG.oE-MIN_D));ne=DRAG.oE;}
   else if(DRAG.type==='right'){ne=snap(clamp(DRAG.oE+dm,DRAG.oS+MIN_D,TL_E));ns=DRAG.oS;}
   DRAG.cs=ns;DRAG.ce=ne;
-  const blk=document.getElementById('blk-'+DRAG.id);
+  const blk=document.getElementById(`blk-${DRAG.eid}-${DRAG.idx}`);
   if(blk){
     blk.style.left=m2l(ns)+'px';blk.style.width=m2w(ne-ns)+'px';
     const t=blk.querySelector('.bt');if(t)t.textContent=fTime(ns)+'–'+fTime(ne);
@@ -367,70 +469,28 @@ function onDragMove(e){
 }
 function onDragEnd(){
   if(!DRAG)return;
-  if(DRAG.cs!==undefined&&STATE.plan[DRAG.dk]&&STATE.plan[DRAG.dk][DRAG.id]){
-    STATE.plan[DRAG.dk][DRAG.id].s=DRAG.cs;
-    STATE.plan[DRAG.dk][DRAG.id].e=DRAG.ce;
-    scheduleSave();
+  if(DRAG.cs!==undefined){
+    const arr=getShifts(DRAG.dk,DRAG.eid);
+    if(arr[DRAG.idx]){arr[DRAG.idx].s=DRAG.cs;arr[DRAG.idx].e=DRAG.ce;setShifts(DRAG.dk,DRAG.eid,arr);}
   }
   DRAG=null;document.body.style.userSelect='';document.body.style.cursor='';
 }
-function startDrag(e,type,id,dk){
+function startDrag(e,type,eid,dk,idx){
   e.stopPropagation();e.preventDefault();
-  const sh=STATE.plan[dk]?.[id];if(!sh)return;
+  const arr=getShifts(dk,eid);const sh=arr[idx];if(!sh)return;
   const cx=e.touches?e.touches[0].clientX:e.clientX;
-  DRAG={type,id,dk,startX:cx,oS:sh.s,oE:sh.e,cs:sh.s,ce:sh.e};
+  DRAG={type,eid,dk,idx,startX:cx,oS:sh.s,oE:sh.e,cs:sh.s,ce:sh.e};
   document.body.style.userSelect='none';
   document.body.style.cursor=type==='move'?'grabbing':'ew-resize';
 }
-function onTrackClick(e,empId,dk){
-  if(e.target.closest('.shift-block')||e.target.closest('.sh-handle')||e.target.closest('.sh-drag'))return;
-  const rect=e.currentTarget.getBoundingClientRect();
-  const localX=(e.touches?e.touches[0].clientX:e.clientX)-rect.left;
-  const clickMin=snap(clamp(l2m(localX),TL_S,TL_E-MIN_D));
-  const emp=STATE.emps.find(e=>e.id===empId);
-  STATE.plan[dk]=STATE.plan[dk]||{};
-  STATE.plan[dk][empId]={s:clickMin,e:clamp(clickMin+MIN_D,TL_S+MIN_D,TL_E),poste:mainPoste(emp||{})};
-  scheduleSave();renderPlanning();
-}
-function createDefault(empId,dk){
-  const emp=STATE.emps.find(e=>e.id===empId);
-  STATE.plan[dk]=STATE.plan[dk]||{};
-  STATE.plan[dk][empId]={s:11*60+30,e:17*60+30,poste:mainPoste(emp||{})};
-  scheduleSave();renderPlanning();
-}
-function deleteShift(empId,dk){
-  if(STATE.plan[dk]){delete STATE.plan[dk][empId];scheduleSave();renderPlanning();}
-}
-function cyclePoste(empId,dk){
-  const sh=STATE.plan[dk]?.[empId];if(!sh)return;
-  const emp=STATE.emps.find(e=>e.id===empId);if(!emp)return;
-  const postes=emp.postes||[mainPoste(emp)];
-  const cur=sh.poste||postes[0];
-  const idx=postes.indexOf(cur);
-  const next=postes[(idx+1)%postes.length];
-  STATE.plan[dk][empId].poste=next;
-  scheduleSave();
-  // Mise à jour directe du badge poste sans re-render complet
-  const badge=document.getElementById('pb-'+empId);
-  if(badge){
-    const ps=PS[next]||PS[POSTES[0]];
-    badge.style.background=ps.bg;badge.style.color=ps.tx;badge.style.borderColor=ps.bd;
-    badge.textContent=next.split('/')[0];
-    badge.title='Poste : '+next+'\n(cliquer pour changer)';
-  }
-}
 
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // TAB NAVIGATION
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 function showTab(t){
   curTab=t;
-  ['planning','employes','export','params'].forEach(k=>{
-    document.getElementById('tab-'+k).style.display=k===t?'':'none';
-  });
-  document.querySelectorAll('.nav-btn').forEach((b,i)=>{
-    b.classList.toggle('active',['planning','employes','export','params'][i]===t);
-  });
+  ['planning','employes','export','params'].forEach(k=>{document.getElementById('tab-'+k).style.display=k===t?'':'none';});
+  document.querySelectorAll('.nav-btn').forEach((b,i)=>{b.classList.toggle('active',['planning','employes','export','params'][i]===t);});
   if(t==='planning')renderPlanning();
   if(t==='employes')renderEmployes();
   if(t==='export')renderExport();
@@ -438,9 +498,9 @@ function showTab(t){
 }
 function render(){renderPlanning();renderEmployes();renderExport();renderParams();}
 
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // PLANNING RENDER
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 function renderPlanning(){
   const days=getDays();
   if(!days.map(d=>toISO(d)).includes(SEL_DAY))SEL_DAY=toISO(days[0]);
@@ -449,8 +509,7 @@ function renderPlanning(){
 
   const pillsHTML=days.map(d=>{
     const key=toISO(d),sel=key===SEL_DAY,we=isWE(d);
-    const dp=STATE.plan[key]||{};
-    const tot=Object.values(dp).reduce((s,sh)=>s+(sh?.s!==undefined?sh.e-sh.s:0),0);
+    const tot=STATE.emps.reduce((s,e)=>s+dayMin(key,e.id),0);
     return`<button class="day-pill${sel?' active':''}${!sel&&we?' we':''}" onclick="selDay('${key}')">
       <div style="text-transform:capitalize;font-size:11px">${fDay(d)}</div>
       <div style="font-size:9px;margin-top:2px;opacity:${sel?.95:.7}">${tot>0?fDur(tot):'—'}</div>
@@ -459,7 +518,7 @@ function renderPlanning(){
 
   const needBadges=POSTES.filter(p=>needs[p]>0).map(p=>{
     const ps=PS[p];
-    const assigned=STATE.emps.filter(e=>empHasPoste(e,p)&&(STATE.plan[SEL_DAY]||{})[e.id]?.s!==undefined).length;
+    const assigned=STATE.emps.filter(e=>empHasPoste(e,p)&&getShifts(SEL_DAY,e.id).length>0).length;
     const ok=assigned>=needs[p];
     return`<div class="need-badge" title="${p}" style="background:${ok?'#F0FDF4':ps.bg};border:1px solid ${ok?'#86EFAC':ps.bd};color:${ok?'#16A34A':ps.tx}">
       <span style="width:6px;height:6px;border-radius:50%;background:${ps.dot};display:inline-block"></span>
@@ -489,10 +548,14 @@ function renderPlanning(){
       </label>
       <div style="display:flex;gap:4px;flex-wrap:wrap">${needBadges||'<span style="font-size:11px;color:#CBD5E1">Saisissez des prévisions</span>'}</div>
     </div>
-    <div class="hint">
-      <span>💡</span>
-      <span><strong>Créer</strong> : ＋ ou clic piste &nbsp;·&nbsp; <strong>Déplacer</strong> : glisser &nbsp;·&nbsp; <strong>Redimensionner</strong> : tirer les bords ⋮ &nbsp;·&nbsp; <strong>Poste</strong> : cliquer le badge coloré &nbsp;·&nbsp; <strong>Supprimer</strong> : ×</span>
-    </div>
+    <div class="hint"><span>💡</span><span>
+      <strong>Créer 1er créneau</strong> : ＋ ou clic piste &nbsp;·&nbsp;
+      <strong>2e créneau</strong> : bouton ＋₂ &nbsp;·&nbsp;
+      <strong>Déplacer</strong> : glisser &nbsp;·&nbsp;
+      <strong>Redimensionner</strong> : tirer ⋮ &nbsp;·&nbsp;
+      <strong>Poste</strong> : cliquer le badge &nbsp;·&nbsp;
+      <strong>Supprimer</strong> : ×
+    </span></div>
     ${buildTimeline(SEL_DAY)}`;
 }
 
@@ -513,7 +576,7 @@ function buildTimeline(dk){
 
   let rows='';
   if(!STATE.emps.length){
-    rows=`<div style="text-align:center;padding:48px;color:#94A3B8"><div style="font-size:36px;margin-bottom:10px">👥</div><div style="font-weight:600;font-size:14px">Aucun employé — ajoutez-en dans l'onglet Employés</div></div>`;
+    rows=`<div style="text-align:center;padding:48px;color:#94A3B8"><div style="font-size:36px;margin-bottom:10px">👥</div><div style="font-weight:600;font-size:14px">Aucun employé — ajoutez-en dans Employés</div></div>`;
   } else {
     POSTES.forEach(poste=>{
       const pe=grouped[poste]||[];if(!pe.length)return;
@@ -522,25 +585,33 @@ function buildTimeline(dk){
         <div style="width:${EC_W}px;flex-shrink:0;padding:4px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${ps.tx};position:sticky;left:0;background:${ps.bg};z-index:5;border-right:1px solid ${ps.bd};display:flex;align-items:center;gap:5px">
           <span style="width:7px;height:7px;border-radius:50%;background:${ps.dot};display:inline-block"></span>${poste}
         </div><div style="flex:1;background:${ps.bg}"></div></div>`;
+
       pe.forEach(emp=>{
-        const sh=(STATE.plan[dk]||{})[emp.id];
+        const shifts=getShifts(dk,emp.id);
+        const rh=ROW_H_BASE+Math.max(0,shifts.length-1)*ROW_H_EXTRA;
         const wh=Math.round(wkHrs(emp.id)*10)/10;
         const over=wh>emp.heures,under=wh>0&&wh<emp.heures*.85;
-        rows+=`<div class="emp-row">
-          <div class="emp-label" style="width:${EC_W}px">
+        const dmin=dayMin(dk,emp.id);
+
+        // Boutons dans la colonne employé
+        const addBtn=`<button onclick="addShift('${emp.id}','${dk}')" title="Ajouter un 2e créneau" style="width:22px;height:22px;border-radius:50%;border:1px solid #86EFAC;background:#F0FDF4;color:#16A34A;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;line-height:1;font-weight:700">＋</button>`;
+        const firstBtn=`<button onclick="createFirstShift('${emp.id}','${dk}')" title="Créer un créneau" style="width:22px;height:22px;border-radius:50%;border:1px solid #BAE6FD;background:#EFF6FF;color:#0369A1;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;line-height:1">＋</button>`;
+
+        rows+=`<div class="emp-row" style="min-height:${rh}px">
+          <div class="emp-label" style="width:${EC_W}px;min-height:${rh}px">
             <div style="flex:1;min-width:0">
               <div style="font-weight:600;font-size:12px;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${emp.prenom} ${emp.nom}</div>
-              <div style="font-size:10px;color:${over?'#DC2626':under?'#D97706':'#94A3B8'}">${wh}h/${emp.heures}h</div>
+              <div style="font-size:10px;color:${over?'#DC2626':under?'#D97706':'#94A3B8'}">${wh}h/sem</div>
+              ${dmin>0?`<div style="font-size:10px;color:#0369A1;font-weight:600">${fDur(dmin)} auj.</div>`:''}
             </div>
-            ${sh
-              ?`<button onclick="deleteShift('${emp.id}','${dk}')" style="width:22px;height:22px;border-radius:50%;border:1px solid #FECDD3;background:#FFF1F2;color:#BE123C;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;line-height:1">×</button>`
-              :`<button onclick="createDefault('${emp.id}','${dk}')" style="width:22px;height:22px;border-radius:50%;border:1px solid #BAE6FD;background:#EFF6FF;color:#0369A1;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;line-height:1">＋</button>`
-            }
+            <div style="display:flex;flex-direction:column;gap:3px;align-items:center">
+              ${shifts.length>0?addBtn:firstBtn}
+            </div>
           </div>
-          <div class="track" style="width:${TL_W}px;height:${ROW_H}px;background-image:repeating-linear-gradient(90deg,transparent 0px,transparent 119px,#E2E8F0 119px,#E2E8F0 120px),repeating-linear-gradient(90deg,transparent 0px,transparent 59px,#F8FAFC 59px,#F8FAFC 60px)"
+          <div class="track" style="width:${TL_W}px;min-height:${rh}px;background-image:repeating-linear-gradient(90deg,transparent 0px,transparent 119px,#E2E8F0 119px,#E2E8F0 120px),repeating-linear-gradient(90deg,transparent 0px,transparent 59px,#F8FAFC 59px,#F8FAFC 60px)"
             onmousedown="onTrackClick(event,'${emp.id}','${dk}')">
             ${nowLine}
-            ${buildBlock(emp,sh,dk)}
+            ${buildBlocks(emp,shifts,dk,rh)}
           </div>
         </div>`;
       });
@@ -555,57 +626,52 @@ function buildTimeline(dk){
     ${rows}
   </div></div>
   <div style="padding:6px 12px;border-top:1px solid #F1F5F9;font-size:10px;color:#94A3B8;background:#F8FAFC;display:flex;gap:12px;flex-wrap:wrap">
-    <span>⟵⟶ Glisser</span><span>⋮ Redimensionner</span><span>Badge coloré = poste (cliquer pour changer)</span>${showNow?'<span style="color:#EF4444">● Maintenant</span>':''}
+    <span>⟵⟶ Glisser</span><span>⋮ Redimensionner</span><span>🟢＋ 2e créneau</span>${showNow?'<span style="color:#EF4444">● Maintenant</span>':''}
   </div></div>`;
 }
 
-function buildBlock(emp,sh,dk){
-  if(!sh||sh.s===undefined)return'';
-  const left=m2l(sh.s),width=m2w(sh.e-sh.s),dur=sh.e-sh.s;
-  const narrow=width<100,vNarrow=width<55;
-  const poste=sh.poste||mainPoste(emp);
-  const ps=PS[poste]||PS[POSTES[0]];
-  // Gradient basé sur le poste
-  const blockBg=`linear-gradient(135deg,${ps.bg},${adjustColor(ps.bg,-8)})`;
+function buildBlocks(emp,shifts,dk,rh){
+  if(!shifts.length)return'';
+  return shifts.map((sh,idx)=>{
+    const left=m2l(sh.s),width=m2w(sh.e-sh.s),dur=sh.e-sh.s;
+    const narrow=width<100,vNarrow=width<55;
+    const poste=sh.poste||mainPoste(emp);
+    const ps=PS[poste]||PS[POSTES[0]];
+    const top=slotTop(idx);
+    const bottom=rh-5-(shifts.length-1-idx)*ROW_H_EXTRA;
+    // Couleur légèrement différente pour distinguer les créneaux multiples
+    const opacity=idx===0?1:0.85;
 
-  return`<div id="blk-${emp.id}" class="shift-block" style="left:${left}px;width:${width}px;top:5px;bottom:5px;background:${blockBg};border:1.5px solid ${ps.bd};min-width:22px">
-    <div class="sh-handle" style="left:0;border-radius:7px 0 0 7px;background:${ps.bd}"
-      onmousedown="startDrag(event,'left','${emp.id}','${dk}')"
-      ontouchstart="startDrag(event,'left','${emp.id}','${dk}')">
-      <span style="font-size:8px;color:${ps.tx};user-select:none">⋮</span>
-    </div>
-    <div class="sh-drag"
-      onmousedown="startDrag(event,'move','${emp.id}','${dk}')"
-      ontouchstart="startDrag(event,'move','${emp.id}','${dk}')">
-      ${vNarrow
-        ?`<span style="font-size:9px;font-weight:700;color:${ps.tx}">…</span>`
-        :`<span class="bt" style="font-size:10px;font-weight:800;color:${ps.tx};white-space:nowrap;line-height:1.3">${fTime(sh.s)}–${fTime(sh.e)}</span>
-         ${!narrow?`<span class="bd" style="font-size:9px;color:${ps.tx};opacity:.7;line-height:1.2">${fDur(dur)}</span>`:''}
-         <span id="pb-${emp.id}" class="poste-pill" onclick="cyclePoste('${emp.id}','${dk}')"
-           title="Poste : ${poste}\n(cliquer pour changer)"
-           style="background:${ps.bd};color:${ps.tx};border-color:${ps.bd};margin-top:2px;font-size:8px">
-           ${poste.split('/')[0]}
-         </span>`
-      }
-    </div>
-    <div class="sh-handle" style="right:0;border-radius:0 7px 7px 0;background:${ps.bd}"
-      onmousedown="startDrag(event,'right','${emp.id}','${dk}')"
-      ontouchstart="startDrag(event,'right','${emp.id}','${dk}')">
-      <span style="font-size:8px;color:${ps.tx};user-select:none">⋮</span>
-    </div>
-  </div>`;
-}
-
-// Légère variation de couleur pour le gradient
-function adjustColor(hex,amt){
-  try{
-    let c=hex.replace('#','');
-    if(c.length===3)c=c.split('').map(x=>x+x).join('');
-    const r=Math.max(0,Math.min(255,parseInt(c.slice(0,2),16)+amt));
-    const g=Math.max(0,Math.min(255,parseInt(c.slice(2,4),16)+amt));
-    const b=Math.max(0,Math.min(255,parseInt(c.slice(4,6),16)+amt));
-    return`rgb(${r},${g},${b})`;
-  }catch(e){return hex;}
+    return`<div id="blk-${emp.id}-${idx}" class="shift-block" style="left:${left}px;width:${width}px;top:${top}px;bottom:${bottom}px;background:${ps.bg};border:1.5px solid ${ps.bd};min-width:22px;opacity:${opacity}">
+      <div class="sh-handle" style="left:0;border-radius:7px 0 0 7px;background:${ps.bd}"
+        onmousedown="startDrag(event,'left','${emp.id}','${dk}',${idx})"
+        ontouchstart="startDrag(event,'left','${emp.id}','${dk}',${idx})">
+        <span style="font-size:8px;color:${ps.tx};user-select:none">⋮</span>
+      </div>
+      <div class="sh-drag"
+        onmousedown="startDrag(event,'move','${emp.id}','${dk}',${idx})"
+        ontouchstart="startDrag(event,'move','${emp.id}','${dk}',${idx})">
+        ${vNarrow
+          ?`<span style="font-size:9px;font-weight:700;color:${ps.tx}">…</span>`
+          :`<span class="bt" style="font-size:10px;font-weight:800;color:${ps.tx};white-space:nowrap;line-height:1.3">${fTime(sh.s)}–${fTime(sh.e)}</span>
+            ${!narrow?`<span class="bd" style="font-size:9px;color:${ps.tx};opacity:.7">${fDur(dur)}</span>`:''}
+            <span id="pb-${emp.id}-${idx}" class="poste-pill" onclick="cyclePoste('${emp.id}','${dk}',${idx})"
+              title="Poste : ${poste} (cliquer pour changer)"
+              style="background:${ps.bd};color:${ps.tx};border-color:${ps.bd};margin-top:2px">
+              ${poste.split('/')[0]}
+            </span>`
+        }
+      </div>
+      <div class="sh-handle" style="right:0;border-radius:0 7px 7px 0;background:${ps.bd}"
+        onmousedown="startDrag(event,'right','${emp.id}','${dk}',${idx})"
+        ontouchstart="startDrag(event,'right','${emp.id}','${dk}',${idx})">
+        <span style="font-size:8px;color:${ps.tx};user-select:none">⋮</span>
+      </div>
+      <!-- Bouton supprimer -->
+      <button onclick="deleteShift('${emp.id}','${dk}',${idx})"
+        style="position:absolute;top:-7px;right:-7px;width:16px;height:16px;border-radius:50%;border:1.5px solid ${ps.bd};background:#fff;color:#BE123C;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:4;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,.15)">×</button>
+    </div>`;
+  }).join('');
 }
 
 function selDay(dk){SEL_DAY=dk;renderPlanning();}
@@ -613,37 +679,33 @@ function changeWeek(n){MON=addDays(MON,n);const days=getDays();if(!days.map(d=>t
 function goToday(){MON=getMonday(new Date());SEL_DAY=toISO(new Date());renderPlanning();}
 function fcChange(field,val){
   STATE.fc[SEL_DAY]=STATE.fc[SEL_DAY]||{};
-  STATE.fc[SEL_DAY][field]=val;
-  scheduleSave();
+  STATE.fc[SEL_DAY][field]=val;scheduleSave();
 }
 
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // EXPORT
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 function renderExport(){
   const days=getDays();
   if(!STATE.emps.length){
-    document.getElementById('tab-export').innerHTML=`<div style="text-align:center;padding:50px;color:#94A3B8;background:#fff;border-radius:12px;border:1px dashed #E2E8F0"><div style="font-size:40px;margin-bottom:10px">📄</div><div style="font-weight:600;font-size:15px;color:#374151;margin-bottom:4px">Aucun employé</div><div>Ajoutez des employés pour générer des plannings</div></div>`;
+    document.getElementById('tab-export').innerHTML=`<div style="text-align:center;padding:50px;color:#94A3B8;background:#fff;border-radius:12px;border:1px dashed #E2E8F0"><div style="font-size:40px;margin-bottom:10px">📄</div><div style="font-weight:600;font-size:15px;color:#374151;margin-bottom:4px">Aucun employé</div></div>`;
     return;
   }
-
   let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-    <div>
-      <div style="font-size:17px;font-weight:800;color:#0F172A">📄 Export Planning</div>
-      <div style="font-size:12px;color:#64748B;text-transform:capitalize">${fWk(MON)}</div>
-    </div>
+    <div><div style="font-size:17px;font-weight:800;color:#0F172A">📄 Export Planning</div>
+    <div style="font-size:12px;color:#64748B;text-transform:capitalize">${fWk(MON)}</div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn-secondary" onclick="changeWeekExport(-7)">‹ Sem. préc.</button>
-      <button class="btn-secondary" onclick="changeWeekExport(7)">Sem. suiv. ›</button>
-      <button class="btn-primary" onclick="printAll()">🖨️ Imprimer tout</button>
+      <button class="btn-secondary" onclick="changeWeekExport(-7)">‹ Préc.</button>
+      <button class="btn-secondary" onclick="changeWeekExport(7)">Suiv. ›</button>
+      <button class="btn-primary" onclick="printAll()">🖨️ Tout imprimer</button>
     </div>
   </div>
   <div style="padding:8px 12px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;margin-bottom:14px;font-size:11px;color:#92400E;display:flex;gap:8px">
-    <span>💡</span><span>Aperçu des plannings par employé. Cliquez sur <strong>🖨️ Imprimer tout</strong> pour générer tous les plannings en PDF, ou <strong>Imprimer</strong> sur chaque carte pour un employé seul.</span>
+    <span>💡</span><span>Aperçu des plannings. Cliquez <strong>🖨️</strong> sur chaque carte pour imprimer un employé, ou <strong>Tout imprimer</strong> pour générer tous les PDF.</span>
   </div>`;
 
   STATE.emps.forEach(emp=>{
-    const totalMin=days.reduce((s,d)=>{const sh=(STATE.plan[toISO(d)]||{})[emp.id];return s+(sh?.s!==undefined?sh.e-sh.s:0);},0);
+    const totalMin=days.reduce((s,d)=>s+dayMin(toISO(d),emp.id),0);
     const totalH=Math.round(totalMin/60*10)/10;
     const ps=PS[mainPoste(emp)];
 
@@ -654,30 +716,31 @@ function renderExport(){
         </div>
         <div style="flex:1">
           <div style="font-weight:700;font-size:14px;color:#0F172A">${emp.prenom} ${emp.nom}</div>
-          <div style="font-size:11px;color:#64748B">${mainPoste(emp)} · ${emp.heures}h contractuelles</div>
+          <div style="font-size:11px;color:#64748B">${mainPoste(emp)} · ${emp.heures}h contrat</div>
         </div>
         <div style="text-align:right">
-          <div style="font-weight:800;font-size:16px;color:${totalH>emp.heures?'#DC2626':totalH<emp.heures*.85?'#D97706':'#16A34A'}">${totalH}h</div>
+          <div style="font-weight:800;font-size:16px;color:${totalH>emp.heures?'#DC2626':totalH<emp.heures*.85&&totalH>0?'#D97706':'#16A34A'}">${totalH}h</div>
           <div style="font-size:10px;color:#94A3B8">cette semaine</div>
         </div>
         <button onclick="printOne('${emp.id}')" style="background:#fff;border:1px solid ${ps.bd};padding:6px 10px;border-radius:7px;font-size:11px;color:${ps.tx};cursor:pointer;flex-shrink:0;font-weight:600;margin-left:8px">🖨️</button>
       </div>
       <div class="exp-week-grid">
         ${days.map(d=>{
-          const key=toISO(d),sh=(STATE.plan[key]||{})[emp.id],we=isWE(d);
-          const poste=sh?.poste||mainPoste(emp);
-          const psp=PS[poste]||ps;
+          const key=toISO(d),shifts=getShifts(key,emp.id),we=isWE(d);
           return`<div class="exp-day-cell" style="background:${we?'#FAFAFA':'#fff'}">
             <div class="exp-day-hdr${we?' we':''}">${fDay(d)}</div>
-            <div class="exp-shift-info">
-              ${sh?.s!==undefined
-                ?`<div style="font-size:12px;font-weight:800;color:#0369A1;line-height:1.3">${fTime(sh.s)}</div>
-                  <div style="font-size:10px;color:#374151">${fTime(sh.e)}</div>
-                  <div style="font-size:9px;color:#64748B;margin-top:1px">${fDur(sh.e-sh.s)}</div>
-                  <div style="display:inline-block;padding:1px 5px;border-radius:8px;font-size:8px;font-weight:700;background:${psp.bg};color:${psp.tx};border:1px solid ${psp.bd};margin-top:3px">${poste.split('/')[0]}</div>`
-                :`<div style="font-size:11px;color:#CBD5E1;padding-top:6px">Repos</div>`
-              }
-            </div>
+            ${shifts.length>0
+              ?shifts.map(sh=>{
+                  const poste=sh.poste||mainPoste(emp);
+                  const psp=PS[poste]||ps;
+                  return`<div style="text-align:center;margin-bottom:4px;padding:3px 2px;border-radius:5px;background:${psp.bg};border:1px solid ${psp.bd}">
+                    <div style="font-size:11px;font-weight:800;color:#0369A1">${fTime(sh.s)}–${fTime(sh.e)}</div>
+                    <div style="font-size:9px;color:#64748B">${fDur(sh.e-sh.s)}</div>
+                    <div style="font-size:8px;font-weight:700;color:${psp.tx}">${poste.split('/')[0]}</div>
+                  </div>`;
+                }).join('')
+              :`<div style="font-size:11px;color:#CBD5E1;text-align:center;padding-top:8px">Repos</div>`
+            }
           </div>`;
         }).join('')}
       </div>
@@ -691,7 +754,7 @@ function changeWeekExport(n){MON=addDays(MON,n);renderExport();}
 
 function buildPrintPage(emp){
   const days=getDays();
-  const totalMin=days.reduce((s,d)=>{const sh=(STATE.plan[toISO(d)]||{})[emp.id];return s+(sh?.s!==undefined?sh.e-sh.s:0);},0);
+  const totalMin=days.reduce((s,d)=>s+dayMin(toISO(d),emp.id),0);
   const totalH=Math.round(totalMin/60*10)/10;
   const ps=PS[mainPoste(emp)];
 
@@ -708,29 +771,30 @@ function buildPrintPage(emp){
         <div style="font-size:18px;font-weight:800;color:#0F172A">${emp.heures}h/sem</div>
       </div>
     </div>
-
     <div class="print-grid">
       ${days.map(d=>{
-        const key=toISO(d),sh=(STATE.plan[key]||{})[emp.id],we=isWE(d);
-        const poste=sh?.poste||mainPoste(emp);
-        const psp=PS[poste]||ps;
+        const key=toISO(d),shifts=getShifts(key,emp.id),we=isWE(d);
         return`<div class="print-day" style="background:${we?'#FAFAFA':'#fff'}">
           <div class="print-day-name${we?' we':''}">${fDay(d)}</div>
-          ${sh?.s!==undefined
-            ?`<div class="print-shift-time">${fTime(sh.s)}<br>${fTime(sh.e)}</div>
-              <div class="print-shift-dur">${fDur(sh.e-sh.s)}</div>
-              <div style="text-align:center"><span class="print-shift-poste" style="background:${psp.bg};color:${psp.tx}">${poste.split('/')[0]}</span></div>`
+          ${shifts.length>0
+            ?shifts.map(sh=>{
+                const poste=sh.poste||mainPoste(emp);
+                const psp=PS[poste]||ps;
+                return`<div class="print-shift" style="background:${psp.bg}">
+                  <div class="print-shift-time">${fTime(sh.s)}–${fTime(sh.e)}</div>
+                  <div class="print-shift-dur">${fDur(sh.e-sh.s)}</div>
+                  <span class="print-shift-poste" style="background:${psp.bg};color:${psp.tx}">${poste.split('/')[0]}</span>
+                </div>`;
+              }).join('')
             :`<div class="print-day-off">Repos</div>`
           }
         </div>`;
       }).join('')}
     </div>
-
     <div class="print-total">
       Total semaine : <strong>${totalH}h</strong>
       ${totalH>emp.heures?` ⚠️ Dépassement de ${Math.round((totalH-emp.heures)*10)/10}h`:''}
     </div>
-
     <div class="print-signature">
       <div class="print-sig-box">Signature employé :<br><br></div>
       <div class="print-sig-box">Signature employeur :<br><br></div>
@@ -741,29 +805,22 @@ function buildPrintPage(emp){
 function printOne(empId){
   const emp=STATE.emps.find(e=>e.id===empId);if(!emp)return;
   const area=document.getElementById('print-area');
-  area.innerHTML=buildPrintPage(emp);
-  area.style.display='block';
+  area.innerHTML=buildPrintPage(emp);area.style.display='block';
   document.getElementById('app').style.display='none';
   window.print();
-  area.style.display='none';
-  document.getElementById('app').style.display='flex';
-  area.innerHTML='';
+  area.style.display='none';document.getElementById('app').style.display='flex';area.innerHTML='';
 }
-
 function printAll(){
   const area=document.getElementById('print-area');
-  area.innerHTML=STATE.emps.map(emp=>buildPrintPage(emp)).join('');
-  area.style.display='block';
+  area.innerHTML=STATE.emps.map(e=>buildPrintPage(e)).join('');area.style.display='block';
   document.getElementById('app').style.display='none';
   window.print();
-  area.style.display='none';
-  document.getElementById('app').style.display='flex';
-  area.innerHTML='';
+  area.style.display='none';document.getElementById('app').style.display='flex';area.innerHTML='';
 }
 
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // EMPLOYEES
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 function renderEmployes(){
   const grouped={};POSTES.forEach(p=>{grouped[p]=[];});
   STATE.emps.forEach(e=>(grouped[mainPoste(e)]||grouped[POSTES[0]]).push(e));
@@ -866,9 +923,9 @@ function delEmp(id){
   scheduleSave();renderEmployes();if(curTab==='planning')renderPlanning();
 }
 
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // PARAMS
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 function renderParams(){
   const p=STATE.par;
   document.getElementById('tab-params').innerHTML=`
@@ -905,9 +962,9 @@ function saveParams(){
   if(btn){btn.textContent='✓ Enregistré';btn.style.background='#16A34A';setTimeout(()=>{btn.textContent='💾 Enregistrer';btn.style.background='';},2000);}
 }
 
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // START
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 init();
 </script>
 </body>

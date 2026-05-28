@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Marmite Planning">
+<meta name="theme-color" content="#0EA5E9">
+<link rel="manifest" href="manifest.json">
+<title>La Marmite Bleue – Planning</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#F1F5F9;display:flex;flex-direction:column;}
+
+/* ── Setup Screen ── */
+#setup-screen{position:fixed;inset:0;background:linear-gradient(160deg,#0EA5E9 0%,#0369A1 60%,#1E3A5F 100%);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;}
+.setup-card{background:#fff;border-radius:20px;padding:28px 24px;width:100%;max-width:400px;box-shadow:0 24px 64px rgba(0,0,0,0.35);}
+.setup-logo{text-align:center;margin-bottom:20px;}
+.setup-logo .icon{font-size:48px;display:block;margin-bottom:8px;}
+.setup-logo .title{font-size:22px;font-weight:800;color:#0F172A;}
+.setup-logo .sub{font-size:13px;color:#64748B;margin-top:3px;}
+.setup-step{background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:14px;border:1px solid #E2E8F0;}
+.setup-step-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#0EA5E9;color:#fff;font-size:11px;font-weight:800;margin-right:8px;flex-shrink:0;}
+.setup-step-title{font-size:13px;font-weight:700;color:#0F172A;display:flex;align-items:center;}
+.setup-step-body{font-size:12px;color:#64748B;margin-top:6px;line-height:1.6;}
+.setup-step-body a{color:#0EA5E9;text-decoration:none;font-weight:600;}
+.setup-inp{width:100%;padding:11px 14px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;color:#0F172A;outline:none;font-family:inherit;margin-top:8px;transition:border-color .15s;}
+.setup-inp:focus{border-color:#0EA5E9;}
+.setup-btn{width:100%;padding:13px;border:none;border-radius:12px;background:linear-gradient(135deg,#0EA5E9,#0284C7);color:#fff;font-size:15px;font-weight:800;cursor:pointer;margin-top:6px;box-shadow:0 4px 14px rgba(14,165,233,0.4);}
+.setup-error{color:#DC2626;font-size:12px;margin-top:6px;display:none;}
+
+/* ── App Shell ── */
+#app{display:none;flex-direction:column;height:100%;}
+.hdr{background:linear-gradient(135deg,#0EA5E9,#0369A1);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.hdr-icon{width:36px;height:36px;border-radius:9px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.hdr-t{font-weight:800;font-size:16px;}
+.hdr-s{font-size:10px;opacity:.75;letter-spacing:.8px;}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#4ADE80;flex-shrink:0;transition:background .3s;}
+.sync-dot.syncing{background:#FCD34D;animation:pulse .8s infinite;}
+.sync-dot.error{background:#F87171;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+/* ── Nav ── */
+.nav{background:#fff;border-bottom:1px solid #E2E8F0;display:flex;flex-shrink:0;}
+.nav-btn{flex:1;padding:11px 4px;border:none;background:none;cursor:pointer;font-size:11px;font-weight:400;color:#94A3B8;border-bottom:3px solid transparent;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px;}
+.nav-btn .nav-ico{font-size:18px;}
+.nav-btn.active{font-weight:700;color:#0EA5E9;border-bottom:3px solid #0EA5E9;}
+
+/* ── Main content ── */
+.main{flex:1;overflow-y:auto;overflow-x:hidden;padding:12px;-webkit-overflow-scrolling:touch;}
+
+/* ── Buttons ── */
+.btn-primary{background:linear-gradient(135deg,#0EA5E9,#0284C7);color:#fff;border:none;padding:9px 16px;border-radius:9px;font-weight:700;font-size:13px;box-shadow:0 2px 8px rgba(14,165,233,.35);cursor:pointer;font-family:inherit;}
+.btn-secondary{background:#fff;border:1px solid #E2E8F0;padding:8px 12px;border-radius:8px;font-size:12px;color:#374151;font-weight:500;cursor:pointer;font-family:inherit;}
+
+/* ── Week nav ── */
+.week-nav{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+.week-nav-mid{flex:1;text-align:center;}
+.week-nav-mid .wk{font-weight:700;font-size:14px;color:#0F172A;}
+.week-nav-mid .mo{font-size:11px;color:#94A3B8;text-transform:capitalize;}
+
+/* ── Table ── */
+.tbl-wrap{overflow-x:auto;border-radius:10px;border:1px solid #E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.07);}
+table{width:100%;border-collapse:collapse;background:#fff;}
+th,td{padding:5px 3px;text-align:center;}
+.col-emp{position:sticky;left:0;background:#fff;z-index:2;text-align:left;padding:7px 10px;}
+.col-emp-hdr{position:sticky;left:0;z-index:3;background:#F8FAFC;text-align:left;padding:7px 10px;}
+
+/* ── Shift cells ── */
+.shift-cell{display:inline-flex;flex-direction:column;align-items:center;padding:4px 3px;border-radius:6px;min-width:46px;cursor:pointer;user-select:none;}
+.shift-empty{display:inline-flex;align-items:center;justify-content:center;width:46px;height:40px;border-radius:6px;border:1px dashed #E2E8F0;color:#CBD5E1;font-size:16px;cursor:pointer;}
+
+/* ── Forecast inputs ── */
+.fc-inp{width:76px;padding:3px 4px;border:1px solid #E2E8F0;border-radius:5px;font-size:10px;text-align:center;color:#374151;outline:none;font-family:inherit;}
+
+/* ── Need badges ── */
+.need-badge{display:inline-flex;align-items:center;gap:2px;padding:2px 4px;border-radius:4px;margin-bottom:2px;font-size:10px;}
+
+/* ── Hint ── */
+.hint{display:flex;gap:8px;padding:8px 11px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;margin-bottom:11px;font-size:11px;color:#92400E;line-height:1.5;}
+
+/* ── Legend ── */
+.legend{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+.legend-item{display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:6px;font-size:11px;}
+
+/* ── Poste tag ── */
+.poste-tag{display:inline-block;padding:1px 6px;border-radius:10px;font-size:9px;font-weight:600;margin:1px;}
+
+/* ── Employees ── */
+.card{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);border:1px solid #E2E8F0;overflow:hidden;margin-bottom:12px;}
+.poste-hdr{padding:6px 14px;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px;}
+.emp-row{display:flex;align-items:center;padding:10px 14px;background:#fff;}
+.emp-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;margin-right:10px;}
+
+/* ── Modal ── */
+.overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);display:flex;align-items:flex-end;justify-content:center;z-index:999;padding:0;}
+@media(min-width:600px){.overlay{align-items:center;padding:16px;}}
+.modal{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+@media(min-width:600px){.modal{border-radius:16px;}}
+.modal-hdr{background:linear-gradient(135deg,#0EA5E9,#0284C7);color:#fff;padding:14px 18px;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:1;border-radius:20px 20px 0 0;}
+@media(min-width:600px){.modal-hdr{border-radius:16px 16px 0 0;}}
+.modal-body{padding:16px;display:flex;flex-direction:column;gap:13px;}
+.modal-foot{padding:12px 16px;border-top:1px solid #F1F5F9;display:flex;gap:8px;justify-content:flex-end;position:sticky;bottom:0;background:#fff;}
+.fld-lbl{font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px;}
+.fld-inp{width:100%;padding:9px 11px;border:1px solid #E2E8F0;border-radius:9px;font-size:14px;color:#0F172A;outline:none;font-family:inherit;}
+.poste-check{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:9px;border:2px solid #E2E8F0;background:#fff;cursor:pointer;transition:all .12s;margin-bottom:5px;user-select:none;}
+.poste-check.sel{border-color:var(--pc-dot);background:var(--pc-bg);}
+.h-btn{padding:7px 13px;border-radius:7px;border:2px solid #E2E8F0;background:#fff;color:#374151;font-size:13px;cursor:pointer;font-family:inherit;}
+.h-btn.sel{border-color:#0EA5E9;background:#EFF6FF;color:#0369A1;font-weight:700;}
+
+/* ── Params ── */
+.param-row{display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:9px;border:1px solid #F1F5F9;background:#FAFAFA;margin-bottom:6px;}
+
+/* ── Loading ── */
+#loading{position:fixed;inset:0;background:#F1F5F9;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:8888;gap:14px;}
+.spinner{width:40px;height:40px;border:4px solid #E2E8F0;border-top-color:#0EA5E9;border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── Settings ── */
+.settings-btn{background:rgba(255,255,255,.15);border:none;padding:6px 10px;border-radius:7px;color:#fff;font-size:11px;cursor:pointer;font-family:inherit;}
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading">
+  <div style="font-size:40px">🫙</div>
+  <div class="spinner"></div>
+  <div style="font-size:13px;color:#64748B;font-weight:500">Chargement…</div>
+</div>
+
+<!-- Setup Screen -->
+<div id="setup-screen" style="display:none;">
+  <div class="setup-card">
+    <div class="setup-logo">
+      <span class="icon">🫙</span>
+      <div class="title">La Marmite Bleue</div>
+      <div class="sub">Planification du personnel</div>
+    </div>
+
+    <div class="setup-step">
+      <div class="setup-step-title"><span class="setup-step-num">1</span>Créer un compte JSONBin</div>
+      <div class="setup-step-body">
+        Rendez-vous sur <a href="https://jsonbin.io" target="_blank">jsonbin.io</a> et créez un compte gratuit (ou connectez-vous).
+      </div>
+    </div>
+
+    <div class="setup-step">
+      <div class="setup-step-title"><span class="setup-step-num">2</span>Copier votre clé API</div>
+      <div class="setup-step-body">
+        Cliquez sur votre <strong>avatar → API Keys</strong> et copiez votre <strong>Master Key</strong> (commence par $2a$…)
+      </div>
+      <input class="setup-inp" type="password" id="setup-key" placeholder="$2a$10$xxxxxxxxxxxxxxxxxxxxxx" autocomplete="off" autocorrect="off" spellcheck="false">
+      <div class="setup-error" id="setup-error">❌ Clé invalide ou erreur réseau. Vérifiez et réessayez.</div>
+    </div>
+
+    <button class="setup-btn" onclick="doSetup()">
+      ✅ Démarrer l'application
+    </button>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app">
+  <div class="hdr">
+    <div class="hdr-icon">🫙</div>
+    <div style="flex:1">
+      <div class="hdr-t">La Marmite Bleue</div>
+      <div class="hdr-s">PLANIFICATION DU PERSONNEL</div>
+    </div>
+    <div id="sync-dot" class="sync-dot" title="Synchronisé"></div>
+    <button class="settings-btn" onclick="showSettings()">⚙️</button>
+  </div>
+
+  <nav class="nav">
+    <button class="nav-btn active" onclick="showTab('planning')">
+      <span class="nav-ico">📅</span>Planning
+    </button>
+    <button class="nav-btn" onclick="showTab('employes')">
+      <span class="nav-ico">👥</span>Employés
+    </button>
+    <button class="nav-btn" onclick="showTab('params')">
+      <span class="nav-ico">⚙️</span>Paramètres
+    </button>
+  </nav>
+
+  <div class="main" id="main-content">
+    <div id="tab-planning"></div>
+    <div id="tab-employes" style="display:none"></div>
+    <div id="tab-params" style="display:none"></div>
+  </div>
+</div>
+
+<div id="modal-overlay" class="overlay" style="display:none" onclick="if(event.target===this)closeModal()"></div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  CONSTANTS
+// ══════════════════════════════════════════════════════
+const POSTES = ['Serveur/Serveuse','Cuisinier','Plongeur','Caisse/Accueil','Bar'];
+const PS = {
+  'Serveur/Serveuse': {bg:'#EFF6FF',bd:'#BFDBFE',tx:'#1E40AF',dot:'#3B82F6'},
+  'Cuisinier':        {bg:'#FFF1F2',bd:'#FECDD3',tx:'#9F1239',dot:'#F43F5E'},
+  'Plongeur':         {bg:'#F0FDF4',bd:'#BBF7D0',tx:'#14532D',dot:'#22C55E'},
+  'Caisse/Accueil':   {bg:'#FFFBEB',bd:'#FDE68A',tx:'#92400E',dot:'#F59E0B'},
+  'Bar':              {bg:'#FAF5FF',bd:'#E9D5FF',tx:'#581C87',dot:'#A855F7'},
+};
+const SH = {
+  M:{l:'Matin',   s:'11h30–17h30',dur:6, bg:'#FEFCE8',tx:'#713F12',bd:'#FCD34D'},
+  S:{l:'Soir',    s:'17h00–23h00',dur:6, bg:'#EFF6FF',tx:'#1E40AF',bd:'#93C5FD'},
+  J:{l:'Journée', s:'11h30–23h00',dur:11,bg:'#F0FDF4',tx:'#14532D',bd:'#86EFAC'},
+  R:{l:'Repos',   s:'—',          dur:0, bg:'#F9FAFB',tx:'#9CA3AF',bd:'#E5E7EB'},
+};
+const SH_CYCLE = ['M','S','J','R',null];
+
+// ══════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════
+let STATE = {
+  emps: [], fc: {}, plan: {},
+  par: {ratioSrv:35,ratioCui:60,minCui:1,seuilPlo:50,seuilBar:1500},
+};
+let MON = getMonday(new Date());
+let API_KEY = '';
+let BIN_ID  = '';
+let saveTimer = null;
+
+// ══════════════════════════════════════════════════════
+//  JSONBIN
+// ══════════════════════════════════════════════════════
+const BASE = 'https://api.jsonbin.io/v3';
+
+async function createBin(key) {
+  const r = await fetch(`${BASE}/b`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Master-Key': key,
+      'X-Bin-Name': 'marmite-planning',
+      'X-Collection-Name': 'MarmiteBleue'
+    },
+    body: JSON.stringify(STATE)
+  });
+  if (!r.ok) throw new Error('create failed');
+  const d = await r.json();
+  return d.metadata.id;
+}
+
+async function loadBin() {
+  const r = await fetch(`${BASE}/b/${BIN_ID}/latest`, {
+    headers: {'X-Master-Key': API_KEY}
+  });
+  if (!r.ok) throw new Error('load failed');
+  const d = await r.json();
+  return d.record;
+}
+
+async function saveBin() {
+  setSyncDot('syncing');
+  try {
+    await fetch(`${BASE}/b/${BIN_ID}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': API_KEY
+      },
+      body: JSON.stringify(STATE)
+    });
+    setSyncDot('ok');
+  } catch(e) {
+    setSyncDot('error');
+  }
+}
+
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveBin, 1500);
+}
+
+function setSyncDot(st) {
+  const d = document.getElementById('sync-dot');
+  if (!d) return;
+  d.className = 'sync-dot' + (st==='ok'?'':' '+st);
+  d.title = st==='ok'?'Synchronisé':st==='syncing'?'Sauvegarde…':'Erreur de synchronisation';
+}
+
+// ══════════════════════════════════════════════════════
+//  SETUP
+// ══════════════════════════════════════════════════════
+async function doSetup() {
+  const key = document.getElementById('setup-key').value.trim();
+  const errEl = document.getElementById('setup-error');
+  errEl.style.display = 'none';
+  if (!key.startsWith('$2a$')) {
+    errEl.textContent = '❌ La clé doit commencer par $2a$…';
+    errEl.style.display = 'block';
+    return;
+  }
+  const btn = document.querySelector('.setup-btn');
+  btn.textContent = '⏳ Connexion…';
+  btn.disabled = true;
+  try {
+    API_KEY = key;
+    const binId = await createBin(key);
+    BIN_ID = binId;
+    localStorage.setItem('mb_apikey', key);
+    localStorage.setItem('mb_binid', binId);
+    document.getElementById('setup-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    render();
+  } catch(e) {
+    errEl.textContent = '❌ Clé invalide ou erreur réseau. Vérifiez et réessayez.';
+    errEl.style.display = 'block';
+    btn.textContent = '✅ Démarrer l\'application';
+    btn.disabled = false;
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════
+async function init() {
+  // Register SW
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  }
+
+  const key = localStorage.getItem('mb_apikey');
+  const bid = localStorage.getItem('mb_binid');
+
+  if (!key || !bid) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('setup-screen').style.display = 'flex';
+    return;
+  }
+
+  API_KEY = key;
+  BIN_ID  = bid;
+
+  try {
+    const data = await loadBin();
+    if (data.emps) STATE.emps = data.emps;
+    if (data.fc)   STATE.fc   = data.fc;
+    if (data.plan) STATE.plan = data.plan;
+    if (data.par)  STATE.par  = data.par;
+    // Migration: poste → postes
+    STATE.emps = STATE.emps.map(e => {
+      if (!e.postes) { e.postes = e.poste ? [e.poste] : []; delete e.poste; }
+      return e;
+    });
+  } catch(e) {
+    // Offline: work with empty state
+    setSyncDot('error');
+  }
+
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  render();
+}
+
+// Settings: reset
+function showSettings() {
+  if (!confirm('Changer de compte JSONBin ?\n\nCela déconnecte cette app. Vos données restent sur JSONBin.')) return;
+  localStorage.removeItem('mb_apikey');
+  localStorage.removeItem('mb_binid');
+  location.reload();
+}
+
+// ══════════════════════════════════════════════════════
+//  DATES
+// ══════════════════════════════════════════════════════
+function getMonday(d) { const r=new Date(d);r.setHours(0,0,0,0);r.setDate(r.getDate()-((r.getDay()||7)-1));return r; }
+function addDays(d,n) { const r=new Date(d);r.setDate(r.getDate()+n);return r; }
+function toISO(d)     { return d.toISOString().split('T')[0]; }
+function fDay(d)      { return d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric'}); }
+function fMon(d)      { return d.toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); }
+function fWk(m)       { const s=addDays(m,6);return m.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+' – '+s.toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}); }
+function isWE(d)      { return d.getDay()===0||d.getDay()===6; }
+function getDays()    { return Array.from({length:7},(_,i)=>addDays(MON,i)); }
+function genId()      { return Math.random().toString(36).slice(2,9); }
+
+// ══════════════════════════════════════════════════════
+//  BUSINESS LOGIC
+// ══════════════════════════════════════════════════════
+function empHasPoste(emp, poste) { return (emp.postes||[]).includes(poste); }
+function mainPoste(emp) { return (emp.postes||[])[0]||'Serveur/Serveuse'; }
+
+function calcNeeds(cov, ca, p) {
+  const c=+cov||0, r=+ca||0;
+  if (!c&&!r) return Object.fromEntries(POSTES.map(x=>[x,0]));
+  return {
+    'Serveur/Serveuse': Math.max(1, Math.ceil(c/p.ratioSrv)),
+    'Cuisinier':        Math.max(p.minCui, Math.ceil(c/p.ratioCui)),
+    'Plongeur':         c>=p.seuilPlo ? 1 : 0,
+    'Caisse/Accueil':   c>0 ? 1 : 0,
+    'Bar':              r>=p.seuilBar ? 1 : 0,
+  };
+}
+
+function autoGen() {
+  const days=getDays(), p=STATE.par, emps=STATE.emps, fc=STATE.fc;
+  const plan = {};
+  days.forEach(d => { plan[toISO(d)] = {}; });
+
+  const empDays    = Object.fromEntries(emps.map(e=>[e.id,0]));
+  const empTargets = Object.fromEntries(emps.map(e=>[e.id,Math.max(1,Math.round(e.heures/6))]));
+
+  const ranked = [...days].sort((a,b) => {
+    const fa=fc[toISO(a)]||{}, fb=fc[toISO(b)]||{};
+    return (+fb.couverts||0)-(+fa.couverts||0);
+  });
+
+  for (const day of ranked) {
+    const key=toISO(day), f=fc[key]||{};
+    const needs = calcNeeds(f.couverts, f.ca, p);
+    POSTES.forEach(poste => {
+      const need = needs[poste];
+      if (!need) return;
+      const cands = emps
+        .filter(e => empHasPoste(e,poste) && !plan[key][e.id] && empDays[e.id]<empTargets[e.id])
+        .sort((a,b) => (empTargets[b.id]-empDays[b.id])-(empTargets[a.id]-empDays[a.id]));
+      let assigned = 0;
+      for (const emp of cands) {
+        if (assigned>=need) break;
+        plan[key][emp.id] = assigned%2===0 ? 'M' : 'S';
+        empDays[emp.id]++;
+        assigned++;
+      }
+    });
+  }
+
+  emps.forEach(emp => {
+    days.forEach(d => { if (!plan[toISO(d)][emp.id]) plan[toISO(d)][emp.id]='R'; });
+  });
+
+  const np = {...STATE.plan};
+  days.forEach(d => { np[toISO(d)] = plan[toISO(d)]; });
+  STATE.plan = np;
+  scheduleSave();
+  renderPlanning();
+}
+
+function getShift(dk, id) { return (STATE.plan[dk]||{})[id]||null; }
+function wkHrs(id) { return getDays().reduce((s,d)=>{ const sh=getShift(toISO(d),id); return s+(sh&&SH[sh]?SH[sh].dur:0); },0); }
+function staffCnt(dk, poste) { return STATE.emps.filter(e=>empHasPoste(e,poste)&&getShift(dk,e.id)&&getShift(dk,e.id)!=='R').length; }
+
+function cycleShift(dk, id) {
+  const cur = getShift(dk, id);
+  const nxt = SH_CYCLE[(SH_CYCLE.indexOf(cur)+1)%SH_CYCLE.length];
+  if (!STATE.plan[dk]) STATE.plan[dk] = {};
+  if (nxt===null) delete STATE.plan[dk][id]; else STATE.plan[dk][id] = nxt;
+  scheduleSave();
+  renderPlanning();
+}
+
+function fcChange(dk, field, val) {
+  if (!STATE.fc[dk]) STATE.fc[dk] = {};
+  STATE.fc[dk][field] = val;
+  scheduleSave();
+  refreshNeedsRow();
+}
+
+function refreshNeedsRow() {
+  getDays().forEach(d => {
+    const key=toISO(d), f=STATE.fc[key]||{};
+    const cell = document.getElementById('need-'+key);
+    if (!cell) return;
+    const needs = calcNeeds(f.couverts, f.ca, STATE.par);
+    cell.innerHTML = buildNeedCell(key, needs);
+  });
+}
+
+function buildNeedCell(key, needs) {
+  const any = POSTES.some(p=>needs[p]>0);
+  if (!any) return '<span style="font-size:10px;color:#CBD5E1">—</span>';
+  return '<div style="display:flex;flex-direction:column;align-items:center">' +
+    POSTES.filter(p=>needs[p]>0).map(p => {
+      const cnt=staffCnt(key,p), need=needs[p], ok=cnt>=need;
+      return `<div class="need-badge" title="${p}" style="background:${ok?'#F0FDF4':'#FFF1F2'};border:1px solid ${ok?'#86EFAC':'#FECDD3'}">
+        <span style="width:5px;height:5px;border-radius:50%;background:${PS[p].dot};display:inline-block"></span>
+        <span style="font-weight:700;color:#374151">${cnt}/${need}</span>
+      </div>`;
+    }).join('') + '</div>';
+}
+
+// ══════════════════════════════════════════════════════
+//  RENDER
+// ══════════════════════════════════════════════════════
+let curTab = 'planning';
+
+function showTab(t) {
+  curTab = t;
+  ['planning','employes','params'].forEach(k => {
+    document.getElementById('tab-'+k).style.display = k===t ? '' : 'none';
+  });
+  document.querySelectorAll('.nav-btn').forEach((b,i) => {
+    b.classList.toggle('active', ['planning','employes','params'][i]===t);
+  });
+  if (t==='planning') renderPlanning();
+  if (t==='employes') renderEmployes();
+  if (t==='params')   renderParams();
+}
+
+function render() {
+  renderPlanning();
+  renderEmployes();
+  renderParams();
+}
+
+// ── Planning ────────────────────────────────────────
+function renderPlanning() {
+  const days = getDays();
+
+  const DCOLS = days.map(d => {
+    const we = isWE(d);
+    return `<th style="padding:6px 2px;font-size:11px;font-weight:600;color:${we?'#DC2626':'#374151'};border-bottom:1px solid #E2E8F0;min-width:84px;background:${we?'#FFF5F5':'#F8FAFC'}">
+      <div style="text-transform:capitalize">${fDay(d)}</div>
+      ${we?'<div style="font-size:9px;color:#FDA4AF">WE</div>':''}
+    </th>`;
+  }).join('');
+
+  const FCR = days.map(d => {
+    const key=toISO(d), f=STATE.fc[key]||{}, we=isWE(d);
+    return `<td style="padding:3px 2px;border-bottom:1px solid #E2E8F0;background:${we?'#FFF9F9':'#FAFAFA'}">
+      <div style="display:flex;flex-direction:column;gap:2px;align-items:center">
+        <input class="fc-inp" type="number" min="0" inputmode="numeric" placeholder="couverts" value="${f.couverts||''}" oninput="fcChange('${key}','couverts',this.value)">
+        <input class="fc-inp" type="number" min="0" inputmode="numeric" placeholder="CA €" value="${f.ca||''}" oninput="fcChange('${key}','ca',this.value)">
+      </div>
+    </td>`;
+  }).join('');
+
+  const NR = days.map(d => {
+    const key=toISO(d), f=STATE.fc[key]||{}, we=isWE(d);
+    const needs = calcNeeds(f.couverts, f.ca, STATE.par);
+    return `<td id="need-${key}" style="padding:3px 2px;border-bottom:2px solid #BAE6FD;vertical-align:top;background:${we?'#EFF9FF':''}">
+      ${buildNeedCell(key, needs)}
+    </td>`;
+  }).join('');
+
+  // Group emps by main poste
+  const grouped = {};
+  POSTES.forEach(p => { grouped[p] = []; });
+  STATE.emps.forEach(e => {
+    const mp = mainPoste(e);
+    (grouped[mp] || grouped[POSTES[0]]).push(e);
+  });
+
+  let empRows = '';
+  POSTES.forEach(poste => {
+    const pe = grouped[poste]||[];
+    if (!pe.length) return;
+    const ps = PS[poste];
+    empRows += `<tr style="background:${ps.bg}">
+      <td colspan="${days.length+2}" style="padding:5px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${ps.tx};border-bottom:1px solid ${ps.bd};border-top:1px solid ${ps.bd}">
+        ● ${poste}
+      </td>
+    </tr>`;
+    pe.forEach(emp => {
+      const hrs=wkHrs(emp.id), over=hrs>emp.heures, under=hrs>0&&hrs<emp.heures*0.85;
+      const extras = (emp.postes||[]).slice(1);
+      const extraTags = extras.length
+        ? '<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:3px">'
+          + extras.map(p=>`<span class="poste-tag" style="background:${PS[p]?.bg||'#F1F5F9'};color:${PS[p]?.tx||'#374151'};border:1px solid ${PS[p]?.bd||'#E2E8F0'}">${p.split('/')[0]}</span>`).join('')
+          + '</div>'
+        : '';
+      const shCells = days.map(d => {
+        const dk=toISO(d), sh=getShift(dk,emp.id), si=sh&&SH[sh], we=isWE(d);
+        if (si) return `<td style="padding:3px 2px;background:${we?'#FAFAFE':'#fff'}">
+          <div class="shift-cell" onclick="cycleShift('${dk}','${emp.id}')" style="background:${si.bg};border:1px solid ${si.bd}">
+            <span style="font-weight:800;font-size:14px;color:${si.tx};line-height:1">${sh}</span>
+            <span style="font-size:9px;color:${si.tx};opacity:.8">${si.s}</span>
+          </div></td>`;
+        return `<td style="padding:3px 2px;background:${we?'#FAFAFE':'#fff'}">
+          <div class="shift-empty" onclick="cycleShift('${dk}','${emp.id}')">+</div></td>`;
+      }).join('');
+
+      empRows += `<tr style="border-bottom:1px solid #F1F5F9">
+        <td class="col-emp" style="border-bottom:1px solid #F1F5F9">
+          <div style="font-weight:600;font-size:13px;color:#0F172A;white-space:nowrap">${emp.prenom} ${emp.nom}</div>
+          <div style="font-size:10px;color:#94A3B8">${emp.heures}h/sem</div>
+          ${extraTags}
+        </td>
+        ${shCells}
+        <td style="padding:5px;text-align:center">
+          <span style="font-weight:800;font-size:13px;color:${over?'#DC2626':under?'#D97706':hrs===0?'#CBD5E1':'#16A34A'}">${hrs}h</span>
+          <div style="font-size:9px;color:#CBD5E1">/${emp.heures}h</div>
+        </td>
+      </tr>`;
+    });
+  });
+
+  if (!empRows) empRows = `<tr><td colspan="${days.length+2}" style="text-align:center;padding:36px;color:#94A3B8">
+    <div style="font-size:34px;margin-bottom:8px">👥</div>
+    <div style="font-weight:600">Aucun employé — allez dans l'onglet Employés</div>
+  </td></tr>`;
+
+  document.getElementById('tab-planning').innerHTML = `
+    <div class="week-nav">
+      <button class="btn-secondary" onclick="changeWeek(-7)" style="font-size:17px;padding:7px 11px">‹</button>
+      <div class="week-nav-mid">
+        <div class="wk">${fWk(MON)}</div>
+        <div class="mo">${fMon(MON)}</div>
+      </div>
+      <button class="btn-secondary" onclick="changeWeek(7)" style="font-size:17px;padding:7px 11px">›</button>
+      <button class="btn-secondary" onclick="goToday()" style="font-size:11px;padding:7px 10px">Auj.</button>
+      <button class="btn-primary" onclick="autoGen()" style="white-space:nowrap">⚡ Générer</button>
+    </div>
+    <div class="hint"><span>💡</span><span>Saisir couverts + CA, puis <strong>⚡ Générer</strong>. Appuyer sur une cellule pour changer le créneau.</span></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr style="background:#F8FAFC">
+            <th class="col-emp-hdr" style="font-size:11px;font-weight:600;color:#64748B;width:120px;border-bottom:1px solid #E2E8F0">Employé</th>
+            ${DCOLS}
+            <th style="font-size:11px;font-weight:600;color:#64748B;border-bottom:1px solid #E2E8F0;width:52px;background:#F8FAFC">H/sem</th>
+          </tr>
+          <tr style="background:#FAFAFA">
+            <td class="col-emp-hdr" style="font-size:11px;color:#64748B;font-weight:600;border-bottom:1px solid #E2E8F0;background:#FAFAFA;padding:5px 10px">📊 Prévisions</td>
+            ${FCR}
+            <td style="border-bottom:1px solid #E2E8F0"></td>
+          </tr>
+          <tr style="background:#F0F9FF">
+            <td class="col-emp-hdr" style="font-size:11px;color:#0369A1;font-weight:700;border-bottom:2px solid #BAE6FD;background:#F0F9FF;padding:5px 10px">🎯 Besoins</td>
+            ${NR}
+            <td style="border-bottom:2px solid #BAE6FD"></td>
+          </tr>
+        </thead>
+        <tbody>${empRows}</tbody>
+      </table>
+    </div>
+    <div class="legend">
+      ${Object.entries(SH).filter(([k])=>k!=='R').map(([k,v])=>`
+        <div class="legend-item" style="background:${v.bg};border:1px solid ${v.bd}">
+          <span style="font-weight:800;font-size:12px;color:${v.tx}">${k}</span>
+          <span style="color:${v.tx};opacity:.85">${v.l} · ${v.s}</span>
+        </div>`).join('')}
+      <div class="legend-item" style="background:#F8FAFC;border:1px solid #E2E8F0;color:#64748B">🟢 OK · 🟡 incomplet · 🔴 dépassement</div>
+    </div>`;
+}
+
+function changeWeek(n) { MON = addDays(MON,n); renderPlanning(); }
+function goToday()     { MON = getMonday(new Date()); renderPlanning(); }
+
+// ── Employés ────────────────────────────────────────
+function renderEmployes() {
+  const grouped = {};
+  POSTES.forEach(p => { grouped[p] = []; });
+  STATE.emps.forEach(e => {
+    const mp = mainPoste(e);
+    (grouped[mp] || grouped[POSTES[0]]).push(e);
+  });
+
+  let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:8px">
+    <div>
+      <div style="font-size:17px;font-weight:800;color:#0F172A">Équipe</div>
+      <div style="font-size:12px;color:#64748B">${STATE.emps.length} employé${STATE.emps.length!==1?'s':''}</div>
+    </div>
+    <button class="btn-primary" onclick="openModal()">+ Ajouter</button>
+  </div>`;
+
+  let any = false;
+  POSTES.forEach(poste => {
+    const pe = grouped[poste]||[];
+    if (!pe.length) return;
+    any = true;
+    const ps = PS[poste];
+    html += `<div class="card">
+      <div class="poste-hdr" style="background:${ps.bg};color:${ps.tx}">
+        <span style="width:8px;height:8px;border-radius:50%;background:${ps.dot};display:inline-block"></span>
+        ${poste}
+        <span style="margin-left:auto;font-weight:500;text-transform:none;font-size:11px;opacity:.8">${pe.length} pers.</span>
+      </div>`;
+    pe.forEach((emp,i) => {
+      const extras = (emp.postes||[]).slice(1);
+      const tags = extras.map(p=>`<span class="poste-tag" style="background:${PS[p]?.bg||'#F1F5F9'};color:${PS[p]?.tx||'#374151'};border:1px solid ${PS[p]?.bd||'#E2E8F0'}">${p}</span>`).join('');
+      html += `<div class="emp-row" style="border-top:${i>0?`1px solid ${ps.bd}`:'none'}">
+        <div class="emp-avatar" style="background:${ps.bg};border:2px solid ${ps.bd};color:${ps.tx}">
+          ${(emp.prenom?.[0]||'?').toUpperCase()}${(emp.nom?.[0]||'').toUpperCase()}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:13px;color:#0F172A">${emp.prenom} ${emp.nom}</div>
+          <div style="font-size:11px;color:#64748B">${emp.heures}h/sem</div>
+          ${tags?`<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:4px">${tags}</div>`:''}
+        </div>
+        <div style="display:flex;gap:5px;flex-shrink:0">
+          <button onclick='openModal(${JSON.stringify(emp)})' style="background:#F1F5F9;border:none;padding:7px 10px;border-radius:7px;font-size:13px;cursor:pointer">✏️</button>
+          <button onclick="delEmp('${emp.id}')" style="background:#FFF1F2;border:none;padding:7px 10px;border-radius:7px;font-size:13px;color:#BE123C;cursor:pointer">🗑️</button>
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+  });
+
+  if (!any) html += `<div style="text-align:center;padding:50px 20px;background:#fff;border-radius:12px;color:#94A3B8;border:1px dashed #E2E8F0">
+    <div style="font-size:46px;margin-bottom:10px">👤</div>
+    <div style="font-weight:700;font-size:15px;margin-bottom:4px;color:#374151">Aucun employé</div>
+    <div style="font-size:12px">Appuyez sur "+ Ajouter" pour commencer</div>
+  </div>`;
+
+  document.getElementById('tab-employes').innerHTML = html;
+}
+
+// ── Params ──────────────────────────────────────────
+function renderParams() {
+  const p = STATE.par;
+  document.getElementById('tab-params').innerHTML = `
+    <div style="max-width:520px">
+      <div class="card" style="padding:18px">
+        <div style="font-size:15px;font-weight:800;color:#0F172A;margin-bottom:4px">⚙️ Ratios de planification</div>
+        <div style="font-size:12px;color:#94A3B8;margin-bottom:14px">Nombre de personnes nécessaires selon les prévisions.</div>
+        ${[
+          {k:'ratioSrv',l:'1 Serveur/Serveuse pour',u:'couverts',p:'Serveur/Serveuse'},
+          {k:'ratioCui',l:'1 Cuisinier pour',       u:'couverts',p:'Cuisinier'},
+          {k:'minCui',  l:'Cuisiniers minimum',      u:'par service',p:'Cuisinier'},
+          {k:'seuilPlo',l:'Plongeur requis à partir de',u:'couverts',p:'Plongeur'},
+          {k:'seuilBar',l:'Bar requis à partir de',  u:'€ de CA',  p:'Bar'},
+        ].map(({k,l,u,p:poste})=>`
+          <div class="param-row">
+            <span style="width:9px;height:9px;border-radius:50%;background:${PS[poste].dot};display:inline-block;flex-shrink:0"></span>
+            <div style="flex:1">
+              <div style="font-size:12px;font-weight:500;color:#374151">${l}</div>
+              <div style="font-size:10px;color:#94A3B8">${u}</div>
+            </div>
+            <input type="number" inputmode="numeric" value="${p[k]}" min="1" onchange="updPar('${k}',this.value)" style="width:68px;padding:7px 8px;border:1px solid #E2E8F0;border-radius:7px;font-size:14px;font-weight:700;text-align:center;color:#0F172A;outline:none;font-family:inherit">
+          </div>`).join('')}
+        <div style="padding:10px 12px;background:#F0F9FF;border-radius:9px;border:1px solid #BAE6FD;margin-bottom:14px">
+          <div style="font-size:11px;font-weight:700;color:#0369A1;margin-bottom:6px">🕐 Créneaux horaires</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
+            ${['M','S','J'].map(k=>{const v=SH[k];return`
+              <div style="padding:8px;border-radius:7px;background:${v.bg};border:1px solid ${v.bd};text-align:center">
+                <div style="font-weight:800;color:${v.tx};font-size:15px">${k}</div>
+                <div style="font-weight:600;color:${v.tx};font-size:11px">${v.l}</div>
+                <div style="font-size:10px;color:${v.tx};opacity:.8">${v.s}</div>
+              </div>`}).join('')}
+          </div>
+        </div>
+        <button id="saveParbtn" class="btn-primary" onclick="saveParams()" style="width:100%;padding:11px;font-size:14px;border-radius:9px">💾 Enregistrer</button>
+      </div>
+
+      <div class="card" style="padding:16px;margin-top:12px">
+        <div style="font-size:13px;font-weight:700;color:#0F172A;margin-bottom:8px">🔄 Synchronisation JSONBin</div>
+        <div style="font-size:12px;color:#64748B;margin-bottom:12px">Vos données sont synchronisées automatiquement sur tous vos appareils.</div>
+        <div style="font-size:12px;color:#374151;padding:8px 12px;background:#F8FAFC;border-radius:7px;margin-bottom:10px;word-break:break-all">
+          Bin ID : <strong>${BIN_ID||'—'}</strong>
+        </div>
+        <button onclick="syncNow()" class="btn-secondary" style="width:100%;padding:10px;font-size:13px;border-radius:8px">🔄 Synchroniser maintenant</button>
+        <button onclick="showSettings()" style="width:100%;margin-top:8px;padding:10px;font-size:13px;border-radius:8px;background:#FFF1F2;border:1px solid #FECDD3;color:#9F1239;cursor:pointer;font-family:inherit">🔑 Changer de compte</button>
+      </div>
+    </div>`;
+}
+
+function updPar(k,v) { STATE.par[k] = +v||0; }
+function saveParams() {
+  scheduleSave();
+  const btn = document.getElementById('saveParbtn');
+  if (btn) { btn.textContent='✓ Enregistré';btn.style.background='#16A34A';setTimeout(()=>{btn.textContent='💾 Enregistrer';btn.style.background='';},2000); }
+}
+function syncNow() { saveBin(); }
+
+function delEmp(id) {
+  if (!confirm('Supprimer cet employé ?')) return;
+  STATE.emps = STATE.emps.filter(e=>e.id!==id);
+  scheduleSave();
+  renderEmployes();
+  if (curTab==='planning') renderPlanning();
+}
+
+// ══════════════════════════════════════════════════════
+//  MODAL
+// ══════════════════════════════════════════════════════
+let editEmp = null;
+let modalPostes = [];
+
+function openModal(emp) {
+  editEmp = emp||null;
+  modalPostes = emp ? [...(emp.postes||[])] : [POSTES[0]];
+  buildModal(emp||{});
+}
+
+function buildModal(e) {
+  document.getElementById('modal-overlay').style.display = 'flex';
+  document.getElementById('modal-overlay').innerHTML = `
+    <div class="modal">
+      <div class="modal-hdr"><span>${e.id?'✏️':'👤'}</span><span>${e.id?'Modifier':'Nouvel employé'}</span></div>
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><label class="fld-lbl">Prénom *</label><input class="fld-inp" id="m-prenom" type="text" value="${e.prenom||''}"></div>
+          <div><label class="fld-lbl">Nom *</label><input class="fld-inp" id="m-nom" type="text" value="${e.nom||''}"></div>
+        </div>
+        <div>
+          <label class="fld-lbl">Postes <span style="font-weight:400;color:#94A3B8;font-size:11px">(⭐ = principal)</span></label>
+          <div id="postes-list">${buildPostesList()}</div>
+          <div style="font-size:11px;color:#94A3B8;margin-top:4px">Le premier poste coché est le poste principal.</div>
+        </div>
+        <div>
+          <label class="fld-lbl">Heures / semaine</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px">
+            ${[20,25,30,35].map(h=>`<button class="h-btn ${(e.heures||35)===h?'sel':''}" onclick="setH(${h})" id="hb-${h}">${h}h</button>`).join('')}
+            <input type="number" inputmode="numeric" id="m-heures" value="${e.heures||35}" min="1" max="48" oninput="syncHBtns(this.value)" style="width:58px;padding:7px 8px;border:1px solid #E2E8F0;border-radius:7px;font-size:13px;text-align:center;outline:none;font-family:inherit">
+            <span style="font-size:11px;color:#94A3B8">h</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-secondary" onclick="closeModal()">Annuler</button>
+        <button class="btn-primary" onclick="saveEmp()">${e.id?'Enregistrer':'Ajouter ✓'}</button>
+      </div>
+    </div>`;
+}
+
+function buildPostesList() {
+  return POSTES.map(p => {
+    const sel = modalPostes.includes(p);
+    const ps = PS[p];
+    const idx = modalPostes.indexOf(p);
+    return `<div class="poste-check ${sel?'sel':''}" onclick="togglePoste('${p}')" style="--pc-dot:${ps.dot};--pc-bg:${ps.bg}">
+      <span style="width:10px;height:10px;border-radius:50%;background:${ps.dot};flex-shrink:0;display:inline-block"></span>
+      <span style="font-size:13px;font-weight:500;flex:1;color:${sel?ps.tx:'#374151'}">${p}</span>
+      ${sel && idx===0 ? `<span style="font-size:11px;font-weight:700;color:${ps.tx}">⭐</span>` : ''}
+      <span style="font-size:15px;color:${sel?ps.dot:'#E2E8F0'}">${sel?'✓':'○'}</span>
+    </div>`;
+  }).join('');
+}
+
+function togglePoste(p) {
+  const idx = modalPostes.indexOf(p);
+  if (idx>=0) modalPostes.splice(idx,1); else modalPostes.push(p);
+  const el = document.getElementById('postes-list');
+  if (el) el.innerHTML = buildPostesList();
+}
+
+function closeModal() { document.getElementById('modal-overlay').style.display='none'; }
+function setH(h) { document.getElementById('m-heures').value=h; syncHBtns(h); }
+function syncHBtns(v) { [20,25,30,35].forEach(h=>{ const b=document.getElementById('hb-'+h); if(b) b.classList.toggle('sel',+v===h); }); }
+
+function saveEmp() {
+  const prenom = (document.getElementById('m-prenom').value||'').trim();
+  const nom    = (document.getElementById('m-nom').value||'').trim();
+  if (!prenom||!nom) { alert('Prénom et Nom sont requis.'); return; }
+  if (!modalPostes.length) { alert('Sélectionnez au moins un poste.'); return; }
+  const heures = +document.getElementById('m-heures').value||35;
+  const id = editEmp?.id||genId();
+  const emp = {id, prenom, nom, postes:[...modalPostes], heures, actif:true};
+  if (editEmp?.id) STATE.emps = STATE.emps.map(e=>e.id===id?emp:e);
+  else STATE.emps = [...STATE.emps, emp];
+  scheduleSave();
+  closeModal();
+  renderEmployes();
+  if (curTab==='planning') renderPlanning();
+}
+
+// ══════════════════════════════════════════════════════
+//  START
+// ══════════════════════════════════════════════════════
+init();
+</script>
+</body>
+</html>

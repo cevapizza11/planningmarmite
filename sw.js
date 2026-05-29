@@ -1,4 +1,4 @@
-const CACHE = 'marmite-planning-v9';
+const CACHE = 'marmite-planning-v10';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {

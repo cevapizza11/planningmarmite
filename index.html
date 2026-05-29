@@ -165,7 +165,7 @@ const PS = {
   'Dessert':   {bg:'#FDF4FF',bd:'#F0ABFC',tx:'#701A75',dot:'#D946EF'},
 };
 const PX_MIN = 2;
-const TL_S   = 4 * 60;
+const TL_S   = 6 * 60;
 const TL_E   = 24 * 60;
 const SNAP   = 15;
 const MIN_D  = 120;
@@ -622,7 +622,7 @@ function renderPlanning(){
 }
 
 function buildTimeline(dk){
-  const hours=Array.from({length:21},(_,i)=>i+4);
+  const hours=Array.from({length:19},(_,i)=>i+6);
   const ticks=hours.map(h=>{
     const maj=h%4===0;
     return`<div style="position:absolute;left:${m2px(h*60)}px;top:0;bottom:0;pointer-events:none">

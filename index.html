@@ -134,12 +134,14 @@ button,input,select{font-family:inherit;cursor:pointer;}
   </div>
   <nav class="nav">
     <button class="nav-btn active" onclick="showTab('planning')"><span class="ico">📅</span>Planning</button>
+    <button class="nav-btn" onclick="showTab('tableau')"><span class="ico">📊</span>Tableau</button>
     <button class="nav-btn" onclick="showTab('employes')"><span class="ico">👥</span>Employés</button>
     <button class="nav-btn" onclick="showTab('export')"><span class="ico">📄</span>Export</button>
     <button class="nav-btn" onclick="showTab('params')"><span class="ico">⚙️</span>Params</button>
   </nav>
   <div class="main">
     <div id="tab-planning"></div>
+    <div id="tab-tableau" style="display:none"></div>
     <div id="tab-employes" style="display:none"></div>
     <div id="tab-export" style="display:none"></div>
     <div id="tab-params" style="display:none"></div>
@@ -336,9 +338,10 @@ function resetAccount(){
 // ═══════════════════════════════════════
 function showTab(t){
   curTab=t;
-  ['planning','employes','export','params'].forEach(k=>{document.getElementById('tab-'+k).style.display=k===t?'':'none';});
-  document.querySelectorAll('.nav-btn').forEach((b,i)=>{b.classList.toggle('active',['planning','employes','export','params'][i]===t);});
+  ['planning','tableau','employes','export','params'].forEach(k=>{document.getElementById('tab-'+k).style.display=k===t?'':'none';});
+  document.querySelectorAll('.nav-btn').forEach((b,i)=>{b.classList.toggle('active',['planning','tableau','employes','export','params'][i]===t);});
   if(t==='planning')renderPlanning();
+  if(t==='tableau')renderTableau();
   if(t==='employes')renderEmployes();
   if(t==='export')renderExport();
   if(t==='params')renderParams();
@@ -886,6 +889,185 @@ function saveEmp(){
 function delEmp(id){
   if(!confirm('Supprimer cet employé ?'))return;
   S.emps=S.emps.filter(e=>e.id!==id);scheduleSave();renderEmployes();if(curTab==='planning')renderPlanning();
+}
+
+// ═══════════════════════════════════════
+// RENDER TABLEAU DE POSITIONNEMENT
+// ═══════════════════════════════════════
+function renderTableau(){
+  const days=getDays();
+  if(!days.map(toISO).includes(SEL))SEL=toISO(days[0]);
+
+  const hours=Array.from({length:19},(_,i)=>i+6); // 6h→24h
+  const f=S.fc[SEL]||{};
+  const needs=calcNeeds(f.couverts,f.ca,S.par);
+
+  // Pour chaque poste × heure : compter les équipiers planifiés avec ce poste à cette heure
+  function countAt(poste,h){
+    const hMin=h*60;
+    return S.emps.filter(e=>
+      getShifts(SEL,e.id).some(sh=>sh.s<=hMin&&sh.e>hMin&&(sh.poste||mainPoste(e))===poste)
+    ).length;
+  }
+  // Noms des équipiers planifiés à un poste à une heure donnée
+  function namesAt(poste,h){
+    const hMin=h*60;
+    return S.emps.filter(e=>
+      getShifts(SEL,e.id).some(sh=>sh.s<=hMin&&sh.e>hMin&&(sh.poste||mainPoste(e))===poste)
+    ).map(e=>e.prenom).join(', ');
+  }
+
+  // Heures actives (au moins 1 équipier planifié)
+  const activeHours=hours.filter(h=>S.emps.some(e=>getShifts(SEL,e.id).some(sh=>sh.s<=h*60&&sh.e>h*60)));
+  const displayHours=activeHours.length?activeHours:hours;
+
+  // Sélecteur de jours
+  const pills=days.map(d=>{
+    const dk=toISO(d),sel=dk===SEL,we=isWE(d);
+    return`<button class="pill${sel?' active':''}${!sel&&we?' we':''}" onclick="SEL='${dk}';renderTableau()">
+      <span style="text-transform:capitalize">${fDay(d)}</span>
+    </button>`;
+  }).join('');
+
+  // Totaux par heure (tous postes confondus)
+  const totalPerHour=displayHours.map(h=>S.emps.filter(e=>getShifts(SEL,e.id).some(sh=>sh.s<=h*60&&sh.e>h*60)).length);
+  const peakTotal=Math.max(...totalPerHour,1);
+
+  // Postes actifs ce jour
+  const activePostes=POSTES.filter(p=>needs[p]>0||displayHours.some(h=>countAt(p,h)>0));
+
+  let html=`
+    <div class="row mb10" style="gap:8px;flex-wrap:wrap;justify-content:space-between">
+      <div>
+        <div style="font-size:17px;font-weight:800;color:#0F172A">📊 Tableau de positionnement</div>
+        <div style="font-size:12px;color:#64748B;text-transform:capitalize">${new Date(SEL+'T12:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})}</div>
+      </div>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <button class="btn-sec" onclick="changeWeek(-7)">‹</button>
+        <button class="btn-sec" onclick="changeWeek(7)">›</button>
+        <button class="btn-sec" onclick="goToday()">Auj.</button>
+        <button class="btn-pri" onclick="printTableau()">🖨️ Imprimer</button>
+      </div>
+    </div>
+    <div class="pills mb10">${pills}</div>`;
+
+  if(!S.emps.length){
+    html+=`<div style="text-align:center;padding:50px;background:#fff;border-radius:12px;border:1px dashed #E2E8F0;color:#94A3B8"><div style="font-size:40px;margin-bottom:8px">👥</div><div>Aucun employé</div></div>`;
+    document.getElementById('tab-tableau').innerHTML=html;return;
+  }
+
+  html+=`<div style="overflow-x:auto;border-radius:10px;border:1px solid #E2E8F0;box-shadow:0 1px 4px rgba(0,0,0,.07);background:#fff">
+    <table id="pos-table" style="border-collapse:collapse;min-width:${120+displayHours.length*52}px;width:100%">
+      <thead>
+        <!-- Ligne heures -->
+        <tr style="background:#F8FAFC;border-bottom:2px solid #E2E8F0">
+          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748B;position:sticky;left:0;background:#F8FAFC;z-index:5;min-width:110px;border-right:2px solid #E2E8F0">
+            Poste / Heure
+          </th>
+          ${displayHours.map((h,i)=>{
+            const tot=totalPerHour[i],pct=tot/peakTotal;
+            const bg=tot===0?'transparent':tot===peakTotal?'#0EA5E9':pct>=0.7?'#38BDF8':pct>=0.4?'#BAE6FD':'#E0F2FE';
+            const tc=tot===0?'#CBD5E1':tot===peakTotal?'#fff':'#0369A1';
+            return`<th style="padding:6px 2px;text-align:center;font-size:10px;font-weight:600;color:#374151;min-width:48px;border-right:1px solid #F1F5F9">
+              <div>${h}h</div>
+              ${tot>0?`<div style="margin:3px auto 0;width:32px;padding:1px 4px;border-radius:8px;background:${bg};color:${tc};font-size:10px;font-weight:800">${tot}</div>`:'<div style="height:18px"></div>'}
+            </th>`;
+          }).join('')}
+          <th style="padding:6px 8px;text-align:center;font-size:10px;font-weight:700;color:#0369A1;min-width:52px;border-left:2px solid #E2E8F0;background:#F0F9FF">Besoin</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${activePostes.map((poste,pi)=>{
+          const ps=PS[poste],need=needs[poste]||0;
+          const rowCounts=displayHours.map(h=>countAt(poste,h));
+          const peakCount=Math.max(...rowCounts,0);
+          const anyPlanned=rowCounts.some(c=>c>0);
+          return`<tr style="border-bottom:1px solid #F1F5F9;background:${pi%2===0?'#fff':'#FAFCFF'}">
+            <td style="padding:8px 12px;position:sticky;left:0;background:${pi%2===0?'#fff':'#FAFCFF'};z-index:3;border-right:2px solid #E2E8F0">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="width:10px;height:10px;border-radius:50%;background:${ps.dot};flex-shrink:0;display:inline-block"></span>
+                <span style="font-size:12px;font-weight:700;color:${ps.tx}">${poste}</span>
+              </div>
+            </td>
+            ${displayHours.map((h,i)=>{
+              const c=rowCounts[i];
+              const names=namesAt(poste,h);
+              const bg=c===0?'transparent':c>=need&&need>0?'#F0FDF4':c===peakCount&&c>0?ps.bg:'#FFF';
+              const border=c>=need&&need>0?'1px solid #86EFAC':c>0?`1px solid ${ps.bd}`:'none';
+              return`<td title="${names?names:'—'}" style="padding:4px 2px;text-align:center;border-right:1px solid #F1F5F9">
+                ${c>0?`<div style="margin:0 auto;width:34px;height:24px;border-radius:6px;background:${bg};border:${border};display:flex;align-items:center;justify-content:center;cursor:default" title="${names}">
+                  <span style="font-size:12px;font-weight:800;color:${c>=need&&need>0?'#16A34A':ps.tx}">${c}</span>
+                </div>`:`<div style="margin:0 auto;width:34px;height:24px;border-radius:6px;background:#F8FAFC;display:flex;align-items:center;justify-content:center">
+                  <span style="font-size:10px;color:#E2E8F0">—</span>
+                </div>`}
+              </td>`;
+            }).join('')}
+            <td style="padding:6px 8px;text-align:center;border-left:2px solid #E2E8F0;background:${pi%2===0?'#F0F9FF':'#EBF7FF'}">
+              ${need>0?`<div style="width:34px;height:24px;border-radius:6px;background:#0EA5E9;display:flex;align-items:center;justify-content:center;margin:0 auto">
+                <span style="font-size:12px;font-weight:800;color:#fff">${need}</span>
+              </div>`:`<span style="font-size:10px;color:#CBD5E1">—</span>`}
+            </td>
+          </tr>`;
+        }).join('')}
+
+        <!-- Ligne TOTAL -->
+        <tr style="background:#F0F9FF;border-top:2px solid #BAE6FD">
+          <td style="padding:8px 12px;position:sticky;left:0;background:#F0F9FF;z-index:3;border-right:2px solid #E2E8F0;font-size:12px;font-weight:800;color:#0369A1">
+            TOTAL équipiers
+          </td>
+          ${displayHours.map((h,i)=>{
+            const tot=totalPerHour[i],peak=tot===peakTotal&&tot>0;
+            return`<td style="padding:4px 2px;text-align:center;border-right:1px solid #BAE6FD">
+              ${tot>0?`<div style="margin:0 auto;width:34px;height:24px;border-radius:6px;background:${peak?'#0EA5E9':'#BAE6FD'};display:flex;align-items:center;justify-content:center">
+                <span style="font-size:12px;font-weight:800;color:${peak?'#fff':'#0369A1'}">${tot}</span>
+              </div>`:`<div style="margin:0 auto;width:34px;height:24px;border-radius:6px;background:#F8FAFC;display:flex;align-items:center;justify-content:center">
+                <span style="font-size:10px;color:#E2E8F0">0</span>
+              </div>`}
+            </td>`;
+          }).join('')}
+          <td style="padding:6px 8px;text-align:center;border-left:2px solid #BAE6FD;background:#E0F2FE">
+            <div style="width:34px;height:24px;border-radius:6px;background:#0369A1;display:flex;align-items:center;justify-content:center;margin:0 auto">
+              <span style="font-size:12px;font-weight:800;color:#fff">${Object.values(needs).reduce((s,v)=>s+v,0)}</span>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Légende -->
+  <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:#64748B;align-items:center">
+    <span style="font-weight:600">Légende :</span>
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:14px;height:14px;border-radius:3px;background:#F0FDF4;border:1px solid #86EFAC;display:inline-block"></span>Besoin couvert ✅</span>
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:14px;height:14px;border-radius:3px;background:#EFF6FF;border:1px solid #BFDBFE;display:inline-block"></span>Planifié (besoin non atteint)</span>
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:14px;height:14px;border-radius:3px;background:#0EA5E9;display:inline-block"></span>Pic / Besoin requis</span>
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:14px;height:14px;border-radius:3px;background:#F8FAFC;border:1px solid #E2E8F0;display:inline-block"></span>Non planifié</span>
+    <span style="margin-left:auto;font-size:11px;color:#94A3B8">Survoler une cellule pour voir les noms</span>
+  </div>`;
+
+  document.getElementById('tab-tableau').innerHTML=html;
+}
+
+function printTableau(){
+  const area=document.getElementById('print-area');
+  const tbl=document.getElementById('pos-table');
+  if(!tbl)return;
+  const d=new Date(SEL+'T12:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  area.innerHTML=`<div class="print-page">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #0EA5E9">
+      <div style="font-size:32px">🫙</div>
+      <div><div style="font-size:13px;font-weight:700;color:#0EA5E9;text-transform:uppercase">La Marmite Bleue</div>
+      <div style="font-size:18px;font-weight:800;color:#0F172A">Plan de positionnement</div>
+      <div style="font-size:13px;color:#64748B;text-transform:capitalize">${d}</div></div>
+    </div>
+    ${tbl.outerHTML}
+  </div>`;
+  area.style.display='block';
+  document.getElementById('app').style.display='none';
+  window.print();
+  area.style.display='none';
+  document.getElementById('app').style.display='flex';
+  area.innerHTML='';
 }
 
 // ═══════════════════════════════════════

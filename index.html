@@ -412,9 +412,12 @@ function cyclePoste(eid,dk,idx){
 }
 
 function onTrackClick(e,eid,dk){
+  // Ignorer si clic sur un bloc existant
   if(e.target.closest('.shift-block')||e.target.closest('.sh-handle')||e.target.closest('.sh-drag'))return;
+  // Ignorer si un drag vient de se terminer
+  if(DRAG)return;
   const rect=e.currentTarget.getBoundingClientRect();
-  const localX=(e.touches?e.touches[0].clientX:e.clientX)-rect.left;
+  const localX=e.clientX-rect.left;
   const clickMin=snap(clamp(l2m(localX),TL_S,TL_E-MIN_D));
   const emp=STATE.emps.find(x=>x.id===eid);
   const existing=getShifts(dk,eid);
@@ -626,7 +629,7 @@ function buildTimeline(dk){
             </div>
           </div>
           <div class="track" style="width:${TL_W}px;height:${rh}px;background-image:repeating-linear-gradient(90deg,transparent 0px,transparent 119px,rgba(0,0,0,0.04) 119px,rgba(0,0,0,0.04) 120px),repeating-linear-gradient(90deg,transparent 0px,transparent 59px,rgba(0,0,0,0.02) 59px,rgba(0,0,0,0.02) 60px);background-color:${zebra}"
-            onmousedown="onTrackClick(event,'${emp.id}','${dk}')">
+            onclick="onTrackClick(event,'${emp.id}','${dk}')">
             ${nowLine}
             ${buildBlocks(emp,shifts,dk,rh)}
           </div>

@@ -170,13 +170,16 @@ input,select{font-family:inherit;}
 // ═══════════════════════════════════════════════════
 // CONSTANTES
 // ═══════════════════════════════════════════════════
-const POSTES=['Serveur/Serveuse','Cuisinier','Plongeur','Caisse/Accueil','Bar'];
+const POSTES=['Moule','Frite','Bar','Plonge','Sauce','Livraison','Salle','Dessert'];
 const PS={
-  'Serveur/Serveuse':{bg:'#EFF6FF',bd:'#BFDBFE',tx:'#1E40AF',dot:'#3B82F6'},
-  'Cuisinier':       {bg:'#FFF1F2',bd:'#FECDD3',tx:'#9F1239',dot:'#F43F5E'},
-  'Plongeur':        {bg:'#F0FDF4',bd:'#BBF7D0',tx:'#14532D',dot:'#22C55E'},
-  'Caisse/Accueil':  {bg:'#FFFBEB',bd:'#FDE68A',tx:'#92400E',dot:'#F59E0B'},
-  'Bar':             {bg:'#FAF5FF',bd:'#E9D5FF',tx:'#581C87',dot:'#A855F7'},
+  'Moule':     {bg:'#EFF6FF',bd:'#BFDBFE',tx:'#1E40AF',dot:'#3B82F6'},
+  'Frite':     {bg:'#FFF7ED',bd:'#FED7AA',tx:'#9A3412',dot:'#F97316'},
+  'Bar':       {bg:'#FAF5FF',bd:'#E9D5FF',tx:'#581C87',dot:'#A855F7'},
+  'Plonge':    {bg:'#F0FDF4',bd:'#BBF7D0',tx:'#14532D',dot:'#22C55E'},
+  'Sauce':     {bg:'#FFF1F2',bd:'#FECDD3',tx:'#9F1239',dot:'#F43F5E'},
+  'Livraison': {bg:'#ECFDF5',bd:'#A7F3D0',tx:'#065F46',dot:'#10B981'},
+  'Salle':     {bg:'#FFFBEB',bd:'#FDE68A',tx:'#92400E',dot:'#F59E0B'},
+  'Dessert':   {bg:'#FDF4FF',bd:'#F0ABFC',tx:'#701A75',dot:'#D946EF'},
 };
 const PX_MIN=2,TL_S=4*60,TL_E=24*60,SLOT=15,MIN_D=120;
 const TL_W=(TL_E-TL_S)*PX_MIN;
@@ -334,7 +337,16 @@ function dayMin(dk,eid){
 function calcNeeds(cov,ca,p){
   const c=+cov||0,r=+ca||0;
   if(!c&&!r)return Object.fromEntries(POSTES.map(x=>[x,0]));
-  return{'Serveur/Serveuse':Math.max(1,Math.ceil(c/p.ratioSrv)),'Cuisinier':Math.max(p.minCui,Math.ceil(c/p.ratioCui)),'Plongeur':c>=p.seuilPlo?1:0,'Caisse/Accueil':c>0?1:0,'Bar':r>=p.seuilBar?1:0};
+  return{
+    'Moule':     Math.max(1,Math.ceil(c/p.ratioSrv)),
+    'Frite':     Math.max(1,Math.ceil(c/p.ratioCui)),
+    'Bar':       r>=p.seuilBar?1:0,
+    'Plonge':    c>=p.seuilPlo?1:0,
+    'Sauce':     Math.max(1,Math.ceil(c/p.ratioCui)),
+    'Livraison': 0,
+    'Salle':     Math.max(1,Math.ceil(c/p.ratioSrv)),
+    'Dessert':   c>0?1:0,
+  };
 }
 
 const BLOCK_H=48; // hauteur fixe de chaque bloc
@@ -518,11 +530,15 @@ function renderPlanning(){
 
   const needBadges=POSTES.filter(p=>needs[p]>0).map(p=>{
     const ps=PS[p];
-    const assigned=STATE.emps.filter(e=>empHasPoste(e,p)&&getShifts(SEL_DAY,e.id).length>0).length;
+    // Compte uniquement les employés planifiés CE JOUR avec CE POSTE
+    const assigned=STATE.emps.filter(e=>{
+      const shifts=getShifts(SEL_DAY,e.id);
+      return shifts.some(sh=>(sh.poste||mainPoste(e))===p);
+    }).length;
     const ok=assigned>=needs[p];
     return`<div class="need-badge" title="${p}" style="background:${ok?'#F0FDF4':ps.bg};border:1px solid ${ok?'#86EFAC':ps.bd};color:${ok?'#16A34A':ps.tx}">
       <span style="width:6px;height:6px;border-radius:50%;background:${ps.dot};display:inline-block"></span>
-      ${assigned}/${needs[p]} ${p.split('/')[0]}
+      ${assigned}/${needs[p]} ${p}
     </div>`;
   }).join('');
 
@@ -931,10 +947,10 @@ function renderParams(){
         <div style="font-size:15px;font-weight:800;color:#0F172A;margin-bottom:4px">⚙️ Ratios de planification</div>
         <div style="font-size:12px;color:#94A3B8;margin-bottom:14px">Nombre de personnes nécessaires selon les prévisions.</div>
         ${[
-          {k:'ratioSrv',l:'1 Serveur/Serveuse pour',u:'couverts',p:'Serveur/Serveuse'},
-          {k:'ratioCui',l:'1 Cuisinier pour',u:'couverts',p:'Cuisinier'},
-          {k:'minCui',l:'Cuisiniers minimum',u:'par service',p:'Cuisinier'},
-          {k:'seuilPlo',l:'Plongeur requis à partir de',u:'couverts',p:'Plongeur'},
+          {k:'ratioSrv',l:'1 Moule/Salle pour',u:'couverts',p:'Moule'},
+          {k:'ratioCui',l:'1 Frite/Sauce pour',u:'couverts',p:'Frite'},
+          {k:'minCui',l:'Cuisiniers minimum',u:'par service',p:'Sauce'},
+          {k:'seuilPlo',l:'Plonge requis à partir de',u:'couverts',p:'Plonge'},
           {k:'seuilBar',l:'Bar requis à partir de',u:'€ de CA',p:'Bar'},
         ].map(({k,l,u,p:poste})=>`
           <div class="param-row">

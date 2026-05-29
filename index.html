@@ -135,6 +135,7 @@ button,input,select{font-family:inherit;cursor:pointer;}
   <nav class="nav">
     <button class="nav-btn active" onclick="showTab('planning')"><span class="ico">📅</span>Planning</button>
     <button class="nav-btn" onclick="showTab('tableau')"><span class="ico">📊</span>Tableau</button>
+    <button class="nav-btn" onclick="showTab('position')"><span class="ico">📋</span>Position</button>
     <button class="nav-btn" onclick="showTab('employes')"><span class="ico">👥</span>Employés</button>
     <button class="nav-btn" onclick="showTab('export')"><span class="ico">📄</span>Export</button>
     <button class="nav-btn" onclick="showTab('params')"><span class="ico">⚙️</span>Params</button>
@@ -142,6 +143,7 @@ button,input,select{font-family:inherit;cursor:pointer;}
   <div class="main">
     <div id="tab-planning"></div>
     <div id="tab-tableau" style="display:none"></div>
+    <div id="tab-position" style="display:none"></div>
     <div id="tab-employes" style="display:none"></div>
     <div id="tab-export" style="display:none"></div>
     <div id="tab-params" style="display:none"></div>
@@ -338,10 +340,11 @@ function resetAccount(){
 // ═══════════════════════════════════════
 function showTab(t){
   curTab=t;
-  ['planning','tableau','employes','export','params'].forEach(k=>{document.getElementById('tab-'+k).style.display=k===t?'':'none';});
-  document.querySelectorAll('.nav-btn').forEach((b,i)=>{b.classList.toggle('active',['planning','tableau','employes','export','params'][i]===t);});
+  ['planning','tableau','position','employes','export','params'].forEach(k=>{document.getElementById('tab-'+k).style.display=k===t?'':'none';});
+  document.querySelectorAll('.nav-btn').forEach((b,i)=>{b.classList.toggle('active',['planning','tableau','position','employes','export','params'][i]===t);});
   if(t==='planning')renderPlanning();
   if(t==='tableau')renderTableau();
+  if(t==='position')renderPosition();
   if(t==='employes')renderEmployes();
   if(t==='export')renderExport();
   if(t==='params')renderParams();
@@ -1062,6 +1065,152 @@ function printTableau(){
     </div>
     ${tbl.outerHTML}
   </div>`;
+  area.style.display='block';
+  document.getElementById('app').style.display='none';
+  window.print();
+  area.style.display='none';
+  document.getElementById('app').style.display='flex';
+  area.innerHTML='';
+}
+
+// ═══════════════════════════════════════
+// PLAN VISUEL DE POSITIONNEMENT
+// ═══════════════════════════════════════
+function renderPosition(){
+  const days=getDays();
+  if(!days.map(toISO).includes(SEL))SEL=toISO(days[0]);
+
+  const pills=days.map(d=>{
+    const dk=toISO(d),sel=dk===SEL,we=isWE(d);
+    return`<button class="pill${sel?' active':''}${!sel&&we?' we':''}" onclick="SEL='${dk}';renderPosition()">
+      <span style="text-transform:capitalize">${fDay(d)}</span>
+    </button>`;
+  }).join('');
+
+  // Pour chaque poste : liste des employés planifiés ce jour avec ce poste
+  function empsByPoste(poste){
+    return S.emps.filter(e=>getShifts(SEL,e.id).some(sh=>(sh.poste||mainPoste(e))===poste));
+  }
+  function slotHTML(poste,slotIdx){
+    const emps=empsByPoste(poste);
+    const emp=emps[slotIdx];
+    const ps=PS[poste]||PS[POSTES[0]];
+    const name=emp?`${emp.prenom} ${emp.nom}`:'';
+    const hrs=emp?getShifts(SEL,emp.id).filter(sh=>(sh.poste||mainPoste(emp))===poste).map(sh=>`${fT(sh.s)}-${fT(sh.e)}`).join(' '):'';
+    return`<div style="border:1.5px solid ${ps.bd};border-radius:6px;padding:5px 8px;min-height:44px;background:${emp?ps.bg:'#fff'};position:relative">
+      <div style="font-size:11px;font-weight:700;color:${emp?ps.tx:'#CBD5E1'};min-height:16px">${name||'&nbsp;'}</div>
+      <div style="font-size:9px;color:${emp?ps.dot:'#E2E8F0'};margin-top:1px">${hrs||'&nbsp;'}</div>
+    </div>`;
+  }
+  function posBox(poste,slots=1,extraStyle=''){
+    const ps=PS[poste]||PS[POSTES[0]];
+    const count=empsByPoste(poste).length;
+    const need=calcNeeds((S.fc[SEL]||{}).couverts,(S.fc[SEL]||{}).ca,S.par)[poste]||0;
+    const ok=count>=need&&need>0;
+    const short=need>0&&count<need;
+    return`<div style="flex:1;${extraStyle}">
+      <div style="display:flex;align-items:center;gap:5px;padding:4px 8px;border-radius:7px 7px 0 0;background:${ps.dot}">
+        <span style="font-size:12px;font-weight:800;color:#fff;flex:1">${poste}</span>
+        ${need>0?`<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:${ok?'rgba(255,255,255,.35)':short?'#FEF2F2':'rgba(255,255,255,.2)'};color:#fff">${count}/${need}</span>`:''}
+      </div>
+      <div style="border:1.5px solid ${ps.bd};border-top:none;border-radius:0 0 7px 7px;padding:5px;display:flex;flex-direction:column;gap:4px;background:#fff">
+        ${Array.from({length:Math.max(slots,need,count,1)},(_,i)=>slotHTML(poste,i)).join('')}
+      </div>
+    </div>`;
+  }
+
+  const fDate=new Date(SEL+'T12:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const f=S.fc[SEL]||{};
+
+  document.getElementById('tab-position').innerHTML=`
+    <div class="row mb10" style="gap:8px;flex-wrap:wrap;justify-content:space-between">
+      <div>
+        <div style="font-size:17px;font-weight:800;color:#0F172A">📋 Plan de positionnement</div>
+        <div style="font-size:12px;color:#64748B;text-transform:capitalize">${fDate}</div>
+      </div>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <button class="btn-sec" onclick="changeWeek(-7)">‹</button>
+        <button class="btn-sec" onclick="changeWeek(7)">›</button>
+        <button class="btn-sec" onclick="goToday()">Auj.</button>
+        <button class="btn-pri" onclick="printPosition()">🖨️ Imprimer</button>
+      </div>
+    </div>
+    <div class="pills mb10">${pills}</div>
+
+    <div id="pos-plan" style="background:#fff;border-radius:12px;border:1px solid #E2E8F0;padding:14px;box-shadow:0 1px 6px rgba(0,0,0,.08)">
+
+      <!-- EN-TÊTE -->
+      <div style="display:flex;align-items:stretch;gap:10px;margin-bottom:12px;padding-bottom:12px;border-bottom:2px solid #E2E8F0">
+        <div style="background:linear-gradient(135deg,#0EA5E9,#0369A1);border-radius:10px;padding:10px 16px;color:#fff;min-width:130px;display:flex;flex-direction:column;justify-content:center">
+          <div style="font-size:18px;margin-bottom:2px">🫙</div>
+          <div style="font-weight:800;font-size:14px;line-height:1.2">La Marmite<br>Bleue</div>
+          <div style="font-size:9px;opacity:.75;margin-top:4px;text-transform:capitalize">${fDate}</div>
+        </div>
+        <div style="flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+          ${[
+            {l:'Couverts prévus',v:f.couverts||'—'},
+            {l:'CA prévu',v:f.ca?f.ca+'€':'—'},
+            {l:'Équipiers planifiés',v:S.emps.filter(e=>getShifts(SEL,e.id).length>0).length},
+            {l:'Shift',v:''},
+          ].map(({l,v})=>`<div style="border:1.5px solid #E2E8F0;border-radius:8px;padding:8px;background:#F8FAFC">
+            <div style="font-size:10px;color:#64748B;font-weight:600;margin-bottom:4px">${l}</div>
+            <div style="font-size:15px;font-weight:800;color:#0F172A">${v}</div>
+            <div style="border-bottom:1px solid #CBD5E1;margin-top:6px"></div>
+          </div>`).join('')}
+        </div>
+      </div>
+
+      <!-- CUISINE -->
+      <div style="margin-bottom:10px">
+        <div style="font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;display:flex;align-items:center;gap:6px">
+          <span style="flex:1;height:1px;background:#E2E8F0"></span>CUISINE<span style="flex:1;height:1px;background:#E2E8F0"></span>
+        </div>
+        <div style="display:flex;gap:8px">
+          ${posBox('Moule',2)}
+          ${posBox('Sauce',2)}
+          ${posBox('Frite',2)}
+          ${posBox('Plonge',1)}
+        </div>
+      </div>
+
+      <!-- SERVICE -->
+      <div style="margin-bottom:10px">
+        <div style="font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;display:flex;align-items:center;gap:6px">
+          <span style="flex:1;height:1px;background:#E2E8F0"></span>SERVICE<span style="flex:1;height:1px;background:#E2E8F0"></span>
+        </div>
+        <div style="display:flex;gap:8px">
+          ${posBox('Salle',3)}
+          ${posBox('Bar',1)}
+          ${posBox('Dessert',1)}
+          ${posBox('Livraison',1)}
+        </div>
+      </div>
+
+      <!-- RESPONSABLE + MESSAGE -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;padding-top:10px;border-top:1px solid #E2E8F0">
+        <div style="border:1.5px solid #E2E8F0;border-radius:8px;padding:10px">
+          <div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:8px">👤 Responsable de service</div>
+          <div style="border-bottom:1px solid #CBD5E1;margin-bottom:6px;height:20px"></div>
+          <div style="font-size:10px;color:#64748B">Date : <span style="display:inline-block;width:100px;border-bottom:1px solid #CBD5E1">&nbsp;</span></div>
+          <div style="font-size:10px;color:#64748B;margin-top:6px">Shift : <span style="display:inline-block;width:100px;border-bottom:1px solid #CBD5E1">&nbsp;</span></div>
+        </div>
+        <div style="border:1.5px solid #E2E8F0;border-radius:8px;padding:10px">
+          <div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:8px">📝 Message du jour</div>
+          <div style="border-bottom:1px solid #CBD5E1;margin-bottom:6px;height:18px"></div>
+          <div style="border-bottom:1px solid #CBD5E1;margin-bottom:6px;height:18px"></div>
+          <div style="border-bottom:1px solid #CBD5E1;height:18px"></div>
+        </div>
+      </div>
+
+    </div>`;
+}
+
+function printPosition(){
+  const plan=document.getElementById('pos-plan');
+  if(!plan)return;
+  const fDate=new Date(SEL+'T12:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const area=document.getElementById('print-area');
+  area.innerHTML=`<div class="print-page">${plan.outerHTML}</div>`;
   area.style.display='block';
   document.getElementById('app').style.display='none';
   window.print();

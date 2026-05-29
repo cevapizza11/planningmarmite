@@ -684,7 +684,13 @@ function buildTimeline(dk){
     });
   }
 
-  return`<div class="tl-outer"><div class="tl-scroll"><div style="min-width:${EC_W+TL_W}px">
+  return`<div class="tl-outer">
+    <!-- Barre de scroll en HAUT -->
+    <div id="tl-top-scroll" style="overflow-x:auto;overflow-y:hidden;height:12px;border-bottom:1px solid #E2E8F0"
+      onscroll="syncScroll('top')">
+      <div style="width:${EC_W+TL_W}px;height:1px"></div>
+    </div>
+    <div class="tl-scroll" id="tl-main-scroll" onscroll="syncScroll('main')"><div style="min-width:${EC_W+TL_W}px">
     <div style="display:flex;border-bottom:2px solid #E2E8F0;background:#F8FAFC;position:sticky;top:0;z-index:10">
       <div style="width:${EC_W}px;flex-shrink:0;padding:6px 10px;font-size:11px;font-weight:600;color:#64748B;position:sticky;left:0;background:#F8FAFC;z-index:11;border-right:1px solid #E2E8F0;display:flex;align-items:center">Employé</div>
       <div style="position:relative;width:${TL_W}px;height:32px;flex-shrink:0">${ticks}</div>
@@ -1002,6 +1008,19 @@ function saveParams(){
   ['ratioMoule','ratioSalle','ratioFrite','seuilPlo','seuilBar'].forEach(k=>{const el=document.getElementById('pr-'+k);if(el)S.par[k]=+el.value||0;});
   scheduleSave();
   const b=document.getElementById('spb');if(b){b.textContent='✓ Enregistré';b.style.background='#16A34A';setTimeout(()=>{b.textContent='💾 Enregistrer';b.style.background='';},2000);}
+}
+
+// Synchronise les deux barres de scroll horizontales
+let _scrolling = false;
+function syncScroll(src) {
+  if (_scrolling) return;
+  _scrolling = true;
+  const top  = document.getElementById('tl-top-scroll');
+  const main = document.getElementById('tl-main-scroll');
+  if (!top || !main) { _scrolling = false; return; }
+  if (src === 'top')  main.scrollLeft = top.scrollLeft;
+  if (src === 'main') top.scrollLeft  = main.scrollLeft;
+  _scrolling = false;
 }
 
 // ═══════════════════════════════════════

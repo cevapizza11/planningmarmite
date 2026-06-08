@@ -354,39 +354,36 @@ function goToday(){MON=getMonday(new Date());SEL=toISO(new Date());showTab(curTa
 function selDay(dk){SEL=dk;renderPlanning();}
 function fcChange(f,v){S.fc[SEL]=S.fc[SEL]||{};S.fc[SEL][f]=v;scheduleSave();}
 
-function calcTransactions(f){
+// Calcul du nombre de transactions : CA ÷ ticket moyen
+function getNbTransactions(f){
   const ca=+f.ca||0;
   const tm=+f.ticketMoyen||+S.par.ticketMoyen||25;
-  if(!ca||!tm)return null;
+  if(!ca||!tm)return 0;
   return Math.round(ca/tm);
 }
 
-function buildTransactionsBadge(f){
-  const nb=calcTransactions(f);
+// Badge affiché dans la barre de prévisions
+function buildFcCalcBadge(f){
+  const nb=getNbTransactions(f);
   const tm=+f.ticketMoyen||+S.par.ticketMoyen||25;
-  if(!nb)return `<span style="color:#94A3B8;font-weight:500">CA ÷ ticket moyen = transactions</span>`;
-  return `🧾 ${nb} transactions <span style="font-size:10px;font-weight:500;opacity:.7;margin-left:2px">(${(+f.ca||0)}€ ÷ ${tm}€)</span>`;
+  const ca=+f.ca||0;
+  if(!nb)return '<span style="color:#94A3B8;font-weight:500">= transactions</span>';
+  return `= 🧾 <span style="font-size:14px">${nb}</span> transactions`;
 }
 
-function updateTransactions(dk){
+// Mise à jour live sans re-render complet
+function updateFcCalc(dk){
   const f=S.fc[dk]||{};
-  const el=document.getElementById('transactions-display');
-  if(el)el.innerHTML=buildTransactionsBadge(f);
-  // Si pas de couverts saisis, proposer automatiquement une estimation
-  const nb=calcTransactions(f);
-  const couEl=document.getElementById('couverts-inp');
-  if(couEl&&nb&&!f.couverts){
-    couEl.placeholder='≈ '+Math.round(nb*1.5)+' (estimés)';
-  }
-  // Mettre à jour les besoins
-  const badges=buildNeedsBadges(dk);
-  const bdgEl=document.querySelector('.fc-bar div:last-child');
-  if(bdgEl)bdgEl.innerHTML=badges;
+  const el=document.getElementById('fc-calc');
+  if(el)el.innerHTML=buildFcCalcBadge(f);
+  // Mettre à jour les badges de besoins
+  const bdg=document.getElementById('needs-badges');
+  if(bdg)bdg.innerHTML=buildNeedsBadges(dk);
 }
 
 function buildNeedsBadges(dk){
   const f=S.fc[dk]||{};
-  const needs=calcNeeds(f.couverts||calcTransactions(f)||0, f.ca, S.par);
+  const needs=calcNeeds(f,S.par);
   return POSTES.filter(p=>needs[p]>0).map(p=>{
     const ps=PS[p];
     const assigned=S.emps.filter(e=>getShifts(dk,e.id).some(sh=>(sh.poste||mainPoste(e))===p)).length;
@@ -394,7 +391,7 @@ function buildNeedsBadges(dk){
     return`<span class="badge" style="background:${ok?'#F0FDF4':ps.bg};border:1px solid ${ok?'#86EFAC':ps.bd};color:${ok?'#16A34A':ps.tx}">
       <i style="width:6px;height:6px;border-radius:50%;background:${ps.dot};display:inline-block;vertical-align:middle;margin-right:2px"></i>${assigned}/${needs[p]} ${p}
     </span>`;
-  }).join('')||'<span style="font-size:11px;color:#CBD5E1">Saisir CA ou couverts</span>';
+  }).join('')||'<span style="font-size:11px;color:#CBD5E1">Saisir CA + ticket moyen</span>';
 }
 
 // ═══════════════════════════════════════
@@ -575,21 +572,33 @@ function cyclePoste(eid,dk,idx){
 // ═══════════════════════════════════════
 // AUTO-GEN
 // ═══════════════════════════════════════
-function calcNeeds(cov,ca,p){
-  const c=+cov||0,r=+ca||0;
-  // Si pas de couverts, estimer depuis CA / ticket moyen
-  const tm=+p.ticketMoyen||25;
-  const base=c>0?c:(r>0?Math.round(r/tm*1.5):0);
-  if(!base&&!r)return Object.fromEntries(POSTES.map(x=>[x,0]));
+// calcNeeds prend l'objet forecast et les paramètres
+// La base de calcul = TRANSACTIONS (CA ÷ ticket moyen)
+function calcNeeds(f, p){
+  if(typeof f === 'number'){ // Rétrocompatibilité ancienne signature (cov, ca, p)
+    const cov=f, ca=arguments[1]; p=arguments[2];
+    const tm=+p.ticketMoyen||25;
+    const trans=ca?Math.round(ca/tm):cov;
+    if(!trans)return Object.fromEntries(POSTES.map(x=>[x,0]));
+    return calcNeedsFromTrans(trans,ca,p);
+  }
+  const tm=+f.ticketMoyen||+p.ticketMoyen||25;
+  const trans=f.ca?Math.round((+f.ca)/tm):0;
+  const ca=+f.ca||0;
+  if(!trans&&!ca)return Object.fromEntries(POSTES.map(x=>[x,0]));
+  return calcNeedsFromTrans(trans,ca,p);
+}
+
+function calcNeedsFromTrans(trans,ca,p){
   return{
-    'Moule':     Math.max(1,Math.ceil(base/(p.ratioMoule||30))),
-    'Frite':     Math.max(1,Math.ceil(base/(p.ratioFrite||40))),
-    'Bar':       r>=(p.seuilBar||1500)?1:0,
-    'Plonge':    base>=(p.seuilPlo||40)?1:0,
-    'Sauce':     Math.max(1,Math.ceil(base/(p.ratioFrite||40))),
+    'Moule':     Math.max(1,Math.ceil(trans/(p.ratioMoule||80))),
+    'Frite':     Math.max(1,Math.ceil(trans/(p.ratioFrite||100))),
+    'Bar':       ca>=(p.seuilBar||1500)?1:0,
+    'Plonge':    trans>=(p.seuilPlo||50)?1:0,
+    'Sauce':     Math.max(1,Math.ceil(trans/(p.ratioFrite||100))),
     'Livraison': 0,
-    'Salle':     Math.max(1,Math.ceil(base/(p.ratioSalle||30))),
-    'Dessert':   base>0?1:0,
+    'Salle':     Math.max(1,Math.ceil(trans/(p.ratioSalle||80))),
+    'Dessert':   trans>0?1:0,
   };
 }
 function autoGen(){
@@ -599,7 +608,7 @@ function autoGen(){
   const target=Object.fromEntries(S.emps.map(e=>[e.id,Math.max(1,Math.round(e.heures/6))]));
   const ranked=[...days].sort((a,b)=>(+((S.fc[toISO(b)]||{}).couverts)||0)-(+((S.fc[toISO(a)]||{}).couverts)||0));
   for(const day of ranked){
-    const dk=toISO(day),f=S.fc[dk]||{},needs=calcNeeds(f.couverts,f.ca,S.par);
+    const dk=toISO(day),f=S.fc[dk]||{},needs=calcNeeds(f,S.par);
     let si=0;
     POSTES.forEach(poste=>{
       const need=needs[poste];if(!need)return;
@@ -625,7 +634,7 @@ function renderPlanning(){
   const days=getDays();
   if(!days.map(toISO).includes(SEL))SEL=toISO(days[0]);
   const f=S.fc[SEL]||{};
-  const needs=calcNeeds(f.couverts,f.ca,S.par);
+  const needs=calcNeeds(f,S.par);
 
   const pills=days.map(d=>{
     const dk=toISO(d),sel=dk===SEL,we=isWE(d);
@@ -659,17 +668,18 @@ function renderPlanning(){
     <div class="pills mb10">${pills}</div>
     <div class="fc-bar mb10">
       <b style="font-size:12px;color:#64748B">📊</b>
-      <label class="fc-lbl">CA € <input class="fc-inp" type="number" value="${f.ca||''}" placeholder="0" oninput="fcChange('ca',this.value);updateTransactions('${SEL}')"></label>
-      <label class="fc-lbl" style="align-items:center;gap:5px">
-        Ticket moyen €
-        <input class="fc-inp" type="number" id="tm-inp" value="${f.ticketMoyen||S.par.ticketMoyen||25}" min="1"
-          style="width:60px" oninput="fcChange('ticketMoyen',this.value);updateTransactions('${SEL}')">
+      <label class="fc-lbl">CA prévu €
+        <input class="fc-inp" type="number" value="${f.ca||''}" placeholder="0"
+          oninput="fcChange('ca',this.value);updateFcCalc('${SEL}')">
       </label>
-      <div id="transactions-display" style="display:flex;align-items:center;gap:6px;padding:4px 10px;background:#F0F9FF;border:1px solid #BAE6FD;border-radius:8px;font-size:12px;font-weight:700;color:#0369A1">
-        ${buildTransactionsBadge(f)}
+      <label class="fc-lbl">÷ Ticket moyen €
+        <input class="fc-inp" type="number" id="tm-inp" value="${f.ticketMoyen||S.par.ticketMoyen||25}" min="1"
+          style="width:58px" oninput="fcChange('ticketMoyen',this.value);updateFcCalc('${SEL}')">
+      </label>
+      <div id="fc-calc" style="display:flex;align-items:center;gap:8px;padding:5px 12px;background:#F0F9FF;border:1px solid #BAE6FD;border-radius:9px;font-size:12px;color:#0369A1;font-weight:700;white-space:nowrap">
+        ${buildFcCalcBadge(f)}
       </div>
-      <label class="fc-lbl">Couverts <input class="fc-inp" type="number" value="${f.couverts||''}" placeholder="auto" oninput="fcChange('couverts',this.value)" id="couverts-inp"></label>
-      <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">${badges}</div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center" id="needs-badges">${badges}</div>
     </div>
     <div class="hint mb10">💡
       <b>Créer</b>: ＋ ou clic piste &nbsp;·&nbsp;
@@ -957,7 +967,7 @@ function renderTableau(){
 
   const hours=Array.from({length:19},(_,i)=>i+6); // 6h→24h
   const f=S.fc[SEL]||{};
-  const needs=calcNeeds(f.couverts,f.ca,S.par);
+  const needs=calcNeeds(f,S.par);
 
   // Pour chaque poste × heure : compter les équipiers planifiés avec ce poste à cette heure
   function countAt(poste,h){
@@ -1159,7 +1169,7 @@ function renderPosition(){
   function posBox(poste,slots=1,extraStyle=''){
     const ps=PS[poste]||PS[POSTES[0]];
     const count=empsByPoste(poste).length;
-    const need=calcNeeds((S.fc[SEL]||{}).couverts,(S.fc[SEL]||{}).ca,S.par)[poste]||0;
+    const need=calcNeeds(S.fc[SEL]||{},S.par)[poste]||0;
     const ok=count>=need&&need>0;
     const short=need>0&&count<need;
     return`<div style="flex:1;${extraStyle}">
@@ -1391,12 +1401,12 @@ function renderParams(){
         <div style="font-size:15px;font-weight:800;color:#0F172A;margin-bottom:4px">⚙️ Ratios de planification</div>
         <div style="font-size:12px;color:#94A3B8;margin-bottom:14px">Nombre de personnes nécessaires selon les prévisions.</div>
         ${[
-          {k:'ticketMoyen',l:'Ticket moyen',          u:'€ par transaction',p:'Moule'},
-          {k:'ratioMoule', l:'1 Moule pour',           u:'couverts',p:'Moule'},
-          {k:'ratioSalle', l:'1 Salle pour',           u:'couverts',p:'Salle'},
-          {k:'ratioFrite', l:'1 Frite/Sauce pour',     u:'couverts',p:'Frite'},
-          {k:'seuilPlo',   l:'Plonge à partir de',     u:'couverts',p:'Plonge'},
-          {k:'seuilBar',   l:'Bar à partir de',        u:'€ de CA', p:'Bar'},
+          {k:'ticketMoyen',l:'Ticket moyen',             u:'€ par transaction (CA ÷ ticket = transactions)',p:'Moule'},
+          {k:'ratioMoule', l:'1 Moule pour',             u:'transactions',p:'Moule'},
+          {k:'ratioSalle', l:'1 Salle pour',             u:'transactions',p:'Salle'},
+          {k:'ratioFrite', l:'1 Frite/Sauce pour',       u:'transactions',p:'Frite'},
+          {k:'seuilPlo',   l:'Plonge à partir de',       u:'transactions',p:'Plonge'},
+          {k:'seuilBar',   l:'Bar à partir de',          u:'€ de CA',     p:'Bar'},
         ].map(({k,l,u,p:poste})=>`
           <div style="display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:9px;border:1px solid #F1F5F9;background:#FAFAFA;margin-bottom:6px">
             <span style="width:9px;height:9px;border-radius:50%;background:${PS[poste].dot};display:inline-block;flex-shrink:0"></span>

@@ -189,7 +189,7 @@ const AUTO_SL = [
 // ═══════════════════════════════════════
 let S = {
   emps:[], fc:{}, plan:{},
-  par:{ratioMoule:30,ratioFrite:40,ratioSalle:30,seuilBar:1500,seuilPlo:40}
+  par:{ratioMoule:30,ratioFrite:40,ratioSalle:30,seuilBar:1500,seuilPlo:40,ticketMoyen:25}
 };
 let MON = getMonday(new Date());
 let SEL = toISO(new Date());
@@ -353,6 +353,49 @@ function changeWeek(n){MON=addDays(MON,n);const d=getDays();if(!d.map(toISO).inc
 function goToday(){MON=getMonday(new Date());SEL=toISO(new Date());showTab(curTab);}
 function selDay(dk){SEL=dk;renderPlanning();}
 function fcChange(f,v){S.fc[SEL]=S.fc[SEL]||{};S.fc[SEL][f]=v;scheduleSave();}
+
+function calcTransactions(f){
+  const ca=+f.ca||0;
+  const tm=+f.ticketMoyen||+S.par.ticketMoyen||25;
+  if(!ca||!tm)return null;
+  return Math.round(ca/tm);
+}
+
+function buildTransactionsBadge(f){
+  const nb=calcTransactions(f);
+  const tm=+f.ticketMoyen||+S.par.ticketMoyen||25;
+  if(!nb)return `<span style="color:#94A3B8;font-weight:500">CA ÷ ticket moyen = transactions</span>`;
+  return `🧾 ${nb} transactions <span style="font-size:10px;font-weight:500;opacity:.7;margin-left:2px">(${(+f.ca||0)}€ ÷ ${tm}€)</span>`;
+}
+
+function updateTransactions(dk){
+  const f=S.fc[dk]||{};
+  const el=document.getElementById('transactions-display');
+  if(el)el.innerHTML=buildTransactionsBadge(f);
+  // Si pas de couverts saisis, proposer automatiquement une estimation
+  const nb=calcTransactions(f);
+  const couEl=document.getElementById('couverts-inp');
+  if(couEl&&nb&&!f.couverts){
+    couEl.placeholder='≈ '+Math.round(nb*1.5)+' (estimés)';
+  }
+  // Mettre à jour les besoins
+  const badges=buildNeedsBadges(dk);
+  const bdgEl=document.querySelector('.fc-bar div:last-child');
+  if(bdgEl)bdgEl.innerHTML=badges;
+}
+
+function buildNeedsBadges(dk){
+  const f=S.fc[dk]||{};
+  const needs=calcNeeds(f.couverts||calcTransactions(f)||0, f.ca, S.par);
+  return POSTES.filter(p=>needs[p]>0).map(p=>{
+    const ps=PS[p];
+    const assigned=S.emps.filter(e=>getShifts(dk,e.id).some(sh=>(sh.poste||mainPoste(e))===p)).length;
+    const ok=assigned>=needs[p];
+    return`<span class="badge" style="background:${ok?'#F0FDF4':ps.bg};border:1px solid ${ok?'#86EFAC':ps.bd};color:${ok?'#16A34A':ps.tx}">
+      <i style="width:6px;height:6px;border-radius:50%;background:${ps.dot};display:inline-block;vertical-align:middle;margin-right:2px"></i>${assigned}/${needs[p]} ${p}
+    </span>`;
+  }).join('')||'<span style="font-size:11px;color:#CBD5E1">Saisir CA ou couverts</span>';
+}
 
 // ═══════════════════════════════════════
 // DRAG — event delegation propre
@@ -534,16 +577,19 @@ function cyclePoste(eid,dk,idx){
 // ═══════════════════════════════════════
 function calcNeeds(cov,ca,p){
   const c=+cov||0,r=+ca||0;
-  if(!c&&!r)return Object.fromEntries(POSTES.map(x=>[x,0]));
+  // Si pas de couverts, estimer depuis CA / ticket moyen
+  const tm=+p.ticketMoyen||25;
+  const base=c>0?c:(r>0?Math.round(r/tm*1.5):0);
+  if(!base&&!r)return Object.fromEntries(POSTES.map(x=>[x,0]));
   return{
-    'Moule':     Math.max(1,Math.ceil(c/(p.ratioMoule||30))),
-    'Frite':     Math.max(1,Math.ceil(c/(p.ratioFrite||40))),
+    'Moule':     Math.max(1,Math.ceil(base/(p.ratioMoule||30))),
+    'Frite':     Math.max(1,Math.ceil(base/(p.ratioFrite||40))),
     'Bar':       r>=(p.seuilBar||1500)?1:0,
-    'Plonge':    c>=(p.seuilPlo||40)?1:0,
-    'Sauce':     Math.max(1,Math.ceil(c/(p.ratioFrite||40))),
+    'Plonge':    base>=(p.seuilPlo||40)?1:0,
+    'Sauce':     Math.max(1,Math.ceil(base/(p.ratioFrite||40))),
     'Livraison': 0,
-    'Salle':     Math.max(1,Math.ceil(c/(p.ratioSalle||30))),
-    'Dessert':   c>0?1:0,
+    'Salle':     Math.max(1,Math.ceil(base/(p.ratioSalle||30))),
+    'Dessert':   base>0?1:0,
   };
 }
 function autoGen(){
@@ -613,8 +659,16 @@ function renderPlanning(){
     <div class="pills mb10">${pills}</div>
     <div class="fc-bar mb10">
       <b style="font-size:12px;color:#64748B">📊</b>
-      <label class="fc-lbl">Couverts <input class="fc-inp" type="number" value="${f.couverts||''}" placeholder="0" oninput="fcChange('couverts',this.value)"></label>
-      <label class="fc-lbl">CA € <input class="fc-inp" type="number" value="${f.ca||''}" placeholder="0" oninput="fcChange('ca',this.value)"></label>
+      <label class="fc-lbl">CA € <input class="fc-inp" type="number" value="${f.ca||''}" placeholder="0" oninput="fcChange('ca',this.value);updateTransactions('${SEL}')"></label>
+      <label class="fc-lbl" style="align-items:center;gap:5px">
+        Ticket moyen €
+        <input class="fc-inp" type="number" id="tm-inp" value="${f.ticketMoyen||S.par.ticketMoyen||25}" min="1"
+          style="width:60px" oninput="fcChange('ticketMoyen',this.value);updateTransactions('${SEL}')">
+      </label>
+      <div id="transactions-display" style="display:flex;align-items:center;gap:6px;padding:4px 10px;background:#F0F9FF;border:1px solid #BAE6FD;border-radius:8px;font-size:12px;font-weight:700;color:#0369A1">
+        ${buildTransactionsBadge(f)}
+      </div>
+      <label class="fc-lbl">Couverts <input class="fc-inp" type="number" value="${f.couverts||''}" placeholder="auto" oninput="fcChange('couverts',this.value)" id="couverts-inp"></label>
       <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">${badges}</div>
     </div>
     <div class="hint mb10">💡
@@ -1337,11 +1391,12 @@ function renderParams(){
         <div style="font-size:15px;font-weight:800;color:#0F172A;margin-bottom:4px">⚙️ Ratios de planification</div>
         <div style="font-size:12px;color:#94A3B8;margin-bottom:14px">Nombre de personnes nécessaires selon les prévisions.</div>
         ${[
-          {k:'ratioMoule',l:'1 Moule pour',        u:'couverts',p:'Moule'},
-          {k:'ratioSalle',l:'1 Salle pour',         u:'couverts',p:'Salle'},
-          {k:'ratioFrite',l:'1 Frite/Sauce pour',   u:'couverts',p:'Frite'},
-          {k:'seuilPlo',  l:'Plonge à partir de',   u:'couverts',p:'Plonge'},
-          {k:'seuilBar',  l:'Bar à partir de',      u:'€ de CA', p:'Bar'},
+          {k:'ticketMoyen',l:'Ticket moyen',          u:'€ par transaction',p:'Moule'},
+          {k:'ratioMoule', l:'1 Moule pour',           u:'couverts',p:'Moule'},
+          {k:'ratioSalle', l:'1 Salle pour',           u:'couverts',p:'Salle'},
+          {k:'ratioFrite', l:'1 Frite/Sauce pour',     u:'couverts',p:'Frite'},
+          {k:'seuilPlo',   l:'Plonge à partir de',     u:'couverts',p:'Plonge'},
+          {k:'seuilBar',   l:'Bar à partir de',        u:'€ de CA', p:'Bar'},
         ].map(({k,l,u,p:poste})=>`
           <div style="display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:9px;border:1px solid #F1F5F9;background:#FAFAFA;margin-bottom:6px">
             <span style="width:9px;height:9px;border-radius:50%;background:${PS[poste].dot};display:inline-block;flex-shrink:0"></span>
@@ -1360,7 +1415,7 @@ function renderParams(){
     </div>`;
 }
 function saveParams(){
-  ['ratioMoule','ratioSalle','ratioFrite','seuilPlo','seuilBar'].forEach(k=>{const el=document.getElementById('pr-'+k);if(el)S.par[k]=+el.value||0;});
+  ['ratioMoule','ratioSalle','ratioFrite','seuilPlo','seuilBar','ticketMoyen'].forEach(k=>{const el=document.getElementById('pr-'+k);if(el)S.par[k]=+el.value||0;});
   scheduleSave();
   const b=document.getElementById('spb');if(b){b.textContent='✓ Enregistré';b.style.background='#16A34A';setTimeout(()=>{b.textContent='💾 Enregistrer';b.style.background='';},2000);}
 }

@@ -371,73 +371,8 @@ function buildFcCalcBadge(f){
   return `= 🧾 <span style="font-size:14px">${nb}</span> transactions`;
 }
 
-// ── Récap CA semaine ──────────────────────────────
-function buildWeekRecap(days){
-  const totalCA = days.reduce((s,d)=>s+(+(S.fc[toISO(d)]||{}).ca||0),0);
-  const totalTrans = days.reduce((s,d)=>{
-    const f=S.fc[toISO(d)]||{};
-    return s+getNbTransactions(f);
-  },0);
-  const maxCA = Math.max(...days.map(d=>+(S.fc[toISO(d)]||{}).ca||0),1);
-
-  const bars = days.map(d=>{
-    const dk=toISO(d),f=S.fc[dk]||{},ca=+(f.ca)||0,sel=dk===SEL;
-    const we=isWE(d);
-    const pct=maxCA>0?ca/maxCA:0;
-    const barH=pct>0?Math.max(4,Math.round(pct*28)):0;
-    const trans=getNbTransactions(f);
-    return `<div onclick="selDay('${dk}')" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;padding:4px 3px;border-radius:8px;background:${sel?'#EFF6FF':'transparent'};border:1px solid ${sel?'#BFDBFE':'transparent'};transition:all .12s">
-      <div style="font-size:9px;font-weight:${sel?700:500};color:${we?'#DC2626':sel?'#1E40AF':'#64748B'};text-transform:capitalize;white-space:nowrap">${fDay(d)}</div>
-      <div style="width:100%;height:30px;display:flex;align-items:flex-end;justify-content:center">
-        ${barH>0
-          ?`<div style="width:70%;border-radius:3px 3px 0 0;height:${barH}px;background:${sel?'#3B82F6':we?'#FCA5A5':'#93C5FD'};transition:height .3s"></div>`
-          :`<div style="width:70%;height:2px;border-radius:1px;background:#F1F5F9"></div>`
-        }
-      </div>
-      <div style="font-size:10px;font-weight:700;color:${ca>0?(sel?'#1E40AF':'#374151'):'#CBD5E1'}">${ca>0?ca+'€':'—'}</div>
-      ${trans>0?`<div style="font-size:9px;color:${sel?'#3B82F6':'#94A3B8'}">${trans}t</div>`:`<div style="height:11px"></div>`}
-    </div>`;
-  }).join('');
-
-  return `<div style="background:#fff;border-radius:10px;border:1px solid #E2E8F0;padding:10px 12px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <span style="font-size:11px;font-weight:700;color:#374151">📅 Récap CA semaine</span>
-      <div style="display:flex;gap:10px;align-items:center">
-        ${totalCA>0?`<span style="font-size:13px;font-weight:800;color:#0369A1">Total : ${totalCA.toLocaleString('fr-FR')} €</span>`:''}
-        ${totalTrans>0?`<span style="font-size:11px;color:#64748B;font-weight:600">${totalTrans} transactions</span>`:''}
-      </div>
-    </div>
-    <div style="display:flex;gap:4px;align-items:flex-end">${bars}</div>
-  </div>`;
-}
-
-// ── Productivité journalière ──────────────────────
-function buildProductivityBadge(dk){
-  const f=S.fc[dk]||{};
-  const ca=+(f.ca)||0;
-  if(!ca)return '';
-
-  // Total heures planifiées ce jour
-  const totalH=S.emps.reduce((s,e)=>{
-    return s+getShifts(dk,e.id).reduce((ss,sh)=>ss+(sh.e-sh.s),0);
-  },0)/60;
-
-  if(totalH<=0)return `<div style="padding:5px 10px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:9px;font-size:11px;color:#92400E;white-space:nowrap">
-    📈 Productivité : planifiez des équipiers pour calculer
-  </div>`;
-
-  const prodHeure=Math.round(ca/totalH);
-  const prodEmp=S.emps.filter(e=>getShifts(dk,e.id).length>0).length;
-  const prodParEmp=prodEmp>0?Math.round(ca/prodEmp):0;
-
-  const level=prodHeure>=250?'#16A34A':prodHeure>=150?'#D97706':'#DC2626';
-  const bg=prodHeure>=250?'#F0FDF4':prodHeure>=150?'#FFFBEB':'#FFF1F2';
-  const bd=prodHeure>=250?'#86EFAC':prodHeure>=150?'#FDE68A':'#FECDD3';
-
-  return `<div id="prod-badge" style="padding:5px 12px;background:${bg};border:1px solid ${bd};border-radius:9px;font-size:12px;color:${level};font-weight:700;white-space:nowrap;cursor:default" title="${totalH.toFixed(1)}h planifiées · ${prodEmp} équipiers">
-    📈 ${prodHeure} €/h &nbsp;·&nbsp; <span style="font-size:11px;font-weight:600">${totalH.toFixed(1)}h planifiées</span> &nbsp;·&nbsp; <span style="font-size:11px;font-weight:600">${prodParEmp} €/équipier</span>
-  </div>`;
-}
+// Mise à jour live sans re-render complet
+function updateFcCalc(dk){
   const f=S.fc[dk]||{};
   const el=document.getElementById('fc-calc');
   if(el)el.innerHTML=buildFcCalcBadge(f);
@@ -457,24 +392,6 @@ function buildNeedsBadges(dk){
       <i style="width:6px;height:6px;border-radius:50%;background:${ps.dot};display:inline-block;vertical-align:middle;margin-right:2px"></i>${assigned}/${needs[p]} ${p}
     </span>`;
   }).join('')||'<span style="font-size:11px;color:#CBD5E1">Saisir CA + ticket moyen</span>';
-}
-
-function updateFcCalc(dk){
-  const f=S.fc[dk]||{};
-  const calc=document.getElementById('fc-calc');
-  if(calc)calc.innerHTML=buildFcCalcBadge(f);
-  const bdg=document.getElementById('needs-badges');
-  if(bdg)bdg.innerHTML=buildNeedsBadges(dk);
-  // Rafraîchir la productivité
-  const prodEl=document.getElementById('prod-badge-wrap');
-  if(prodEl)prodEl.innerHTML=buildProductivityBadge(dk);
-  // Rafraîchir le récap semaine
-  renderWeekRecap();
-}
-
-function renderWeekRecap(){
-  const el=document.getElementById('week-recap-wrap');
-  if(el)el.innerHTML=buildWeekRecap(getDays());
 }
 
 // ═══════════════════════════════════════
@@ -749,9 +666,6 @@ function renderPlanning(){
       <button class="btn-pri" onclick="autoGen()">⚡ Générer</button>
     </div>
     <div class="pills mb10">${pills}</div>
-
-    <div id="week-recap-wrap">${buildWeekRecap(days)}</div>
-
     <div class="fc-bar mb10">
       <b style="font-size:12px;color:#64748B">📊</b>
       <label class="fc-lbl">CA prévu €
@@ -765,7 +679,6 @@ function renderPlanning(){
       <div id="fc-calc" style="display:flex;align-items:center;gap:8px;padding:5px 12px;background:#F0F9FF;border:1px solid #BAE6FD;border-radius:9px;font-size:12px;color:#0369A1;font-weight:700;white-space:nowrap">
         ${buildFcCalcBadge(f)}
       </div>
-      <div id="prod-badge-wrap">${buildProductivityBadge(SEL)}</div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center" id="needs-badges">${badges}</div>
     </div>
     <div class="hint mb10">💡

@@ -473,6 +473,10 @@ function pUp(e){
 // RENDER PLANNING
 // ═══════════════════════════════════════════════════════════
 function renderPlanning(){
+  // Sauvegarder la position du scroll avant re-render
+  const scrollMain = document.getElementById('tl-main');
+  const savedScroll = scrollMain ? scrollMain.scrollLeft : 0;
+
   const ds=days(),f=S.fc[SEL]||{},needs=calcNeeds(f),t=getTrans(f);
   const pills=ds.map(d=>{const dk=iso(d),sel=dk===SEL,we=isWE(d),tot=S.emps.reduce((s,e)=>s+dayMin(dk,e.id),0);
     return`<button class="pill${sel?' active':''}${!sel&&we?' we':''}" onclick="selDay('${dk}')">
@@ -517,6 +521,16 @@ function renderPlanning(){
       <b>Supprimer</b> : ×
     </div>
     ${buildTimeline(SEL)}`;
+
+  // Restaurer la position du scroll après que le DOM est reconstruit
+  if(savedScroll > 0){
+    requestAnimationFrame(() => {
+      const m = document.getElementById('tl-main');
+      const t = document.getElementById('tl-top');
+      if(m) m.scrollLeft = savedScroll;
+      if(t) t.scrollLeft = savedScroll;
+    });
+  }
 }
 
 function buildTimeline(dk){

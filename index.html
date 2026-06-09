@@ -139,17 +139,32 @@ button,input,select,textarea{font-family:inherit;cursor:pointer}
 // ═══════════════════════════════════════════════════════════
 // CONSTANTES
 // ═══════════════════════════════════════════════════════════
-const POSTES=['Moule','Frite','Bar','Plonge','Sauce','Livraison','Salle','Dessert'];
-const PS={
-  Moule:    {bg:'#EFF6FF',bd:'#BFDBFE',tx:'#1E40AF',dot:'#3B82F6'},
-  Frite:    {bg:'#FFF7ED',bd:'#FED7AA',tx:'#9A3412',dot:'#F97316'},
-  Bar:      {bg:'#FAF5FF',bd:'#E9D5FF',tx:'#581C87',dot:'#A855F7'},
-  Plonge:   {bg:'#F0FDF4',bd:'#BBF7D0',tx:'#14532D',dot:'#22C55E'},
-  Sauce:    {bg:'#FFF1F2',bd:'#FECDD3',tx:'#9F1239',dot:'#F43F5E'},
-  Livraison:{bg:'#ECFDF5',bd:'#A7F3D0',tx:'#065F46',dot:'#10B981'},
-  Salle:    {bg:'#FFFBEB',bd:'#FDE68A',tx:'#92400E',dot:'#F59E0B'},
-  Dessert:  {bg:'#FDF4FF',bd:'#F0ABFC',tx:'#701A75',dot:'#D946EF'},
-};
+const COLOR_PALETTE=[
+  {key:'blue',   bg:'#EFF6FF',bd:'#BFDBFE',tx:'#1E40AF',dot:'#3B82F6',label:'Bleu'},
+  {key:'orange', bg:'#FFF7ED',bd:'#FED7AA',tx:'#9A3412',dot:'#F97316',label:'Orange'},
+  {key:'purple', bg:'#FAF5FF',bd:'#E9D5FF',tx:'#581C87',dot:'#A855F7',label:'Violet'},
+  {key:'green',  bg:'#F0FDF4',bd:'#BBF7D0',tx:'#14532D',dot:'#22C55E',label:'Vert'},
+  {key:'red',    bg:'#FFF1F2',bd:'#FECDD3',tx:'#9F1239',dot:'#F43F5E',label:'Rouge'},
+  {key:'teal',   bg:'#ECFDF5',bd:'#A7F3D0',tx:'#065F46',dot:'#10B981',label:'Turquoise'},
+  {key:'yellow', bg:'#FFFBEB',bd:'#FDE68A',tx:'#92400E',dot:'#F59E0B',label:'Jaune'},
+  {key:'pink',   bg:'#FDF4FF',bd:'#F0ABFC',tx:'#701A75',dot:'#D946EF',label:'Rose'},
+  {key:'indigo', bg:'#EEF2FF',bd:'#C7D2FE',tx:'#3730A3',dot:'#6366F1',label:'Indigo'},
+  {key:'cyan',   bg:'#ECFEFF',bd:'#A5F3FC',tx:'#164E63',dot:'#06B6D4',label:'Cyan'},
+  {key:'slate',  bg:'#F8FAFC',bd:'#CBD5E1',tx:'#334155',dot:'#64748B',label:'Gris'},
+  {key:'lime',   bg:'#F7FEE7',bd:'#D9F99D',tx:'#365314',dot:'#84CC16',label:'Lime'},
+];
+const DEFAULT_POSTES=[
+  {id:'Moule',    ico:'🦪',color:'blue'},
+  {id:'Frite',    ico:'🍟',color:'orange'},
+  {id:'Bar',      ico:'🍺',color:'purple'},
+  {id:'Plonge',   ico:'🧼',color:'green'},
+  {id:'Sauce',    ico:'🥣',color:'red'},
+  {id:'Livraison',ico:'🛵',color:'teal'},
+  {id:'Salle',    ico:'🍽️',color:'yellow'},
+  {id:'Dessert',  ico:'🍮',color:'pink'},
+];
+function getPostes(){return(S.postesConfig&&S.postesConfig.length)?S.postesConfig:DEFAULT_POSTES;}
+function getPS(){const out={};getPostes().forEach(p=>{const c=COLOR_PALETTE.find(x=>x.key===p.color)||COLOR_PALETTE[0];out[p.id]={bg:c.bg,bd:c.bd,tx:c.tx,dot:c.dot};});return out;}
 const PX=2, TL_S=6*60, TL_E=24*60, SNAP=15, MIN_D=120;
 const TL_W=(TL_E-TL_S)*PX, EC_W=130, BH=46, BG=6;
 const JBIN='https://api.jsonbin.io/v3';
@@ -157,7 +172,7 @@ const JBIN='https://api.jsonbin.io/v3';
 // ═══════════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════════
-let S={emps:[],fc:{},plan:{},par:{ratioMoule:80,ratioFrite:100,ratioSalle:80,seuilBar:1500,seuilPlo:50,ticketMoyen:25}};
+let S={emps:[],fc:{},plan:{},par:{ratioMoule:80,ratioFrite:100,ratioSalle:80,seuilBar:1500,seuilPlo:50,ticketMoyen:25},postesConfig:[...DEFAULT_POSTES]};
 let MON=monday(new Date()), SEL=iso(new Date()), curTab='planning';
 let AK='',BID='',saveT=null,DRAG=null;
 
@@ -184,7 +199,7 @@ function fNum(n){return n.toLocaleString('fr-FR');}
 // ═══════════════════════════════════════════════════════════
 // HELPERS PLANNING
 // ═══════════════════════════════════════════════════════════
-function mainP(e){return(e.postes||[])[0]||POSTES[0];}
+function mainP(e){return(e.postes||[])[0]||getPostes().map(p=>p.id)[0];}
 function shifts(dk,eid){
   const v=(S.plan[dk]||{})[eid];
   if(!v)return[];
@@ -209,7 +224,7 @@ function getTrans(f){
 }
 function calcNeeds(f){
   const t=getTrans(f),ca=+(f.ca)||0,p=S.par;
-  if(!t&&!ca)return Object.fromEntries(POSTES.map(x=>[x,0]));
+  if(!t&&!ca)return Object.fromEntries(getPostes().map(p=>p.id).map(x=>[x,0]));
   return{
     Moule:    Math.max(1,Math.ceil(t/(p.ratioMoule||80))),
     Frite:    Math.max(1,Math.ceil(t/(p.ratioFrite||100))),
@@ -266,8 +281,8 @@ function weekRecap(){
 }
 function needsBadges(dk){
   const needs=calcNeeds(S.fc[dk]||{});
-  const html=POSTES.filter(p=>needs[p]>0).map(p=>{
-    const ps=PS[p],a=S.emps.filter(e=>shifts(dk,e.id).some(sh=>(sh.poste||mainP(e))===p)).length;
+  const html=getPostes().map(p=>p.id).filter(p=>needs[p]>0).map(p=>{
+    const ps=getPS()[p],a=S.emps.filter(e=>shifts(dk,e.id).some(sh=>(sh.poste||mainP(e))===p)).length;
     const ok=a>=needs[p];
     return`<span class="badge" style="background:${ok?'#F0FDF4':ps.bg};border:1px solid ${ok?'#86EFAC':ps.bd};color:${ok?'#16A34A':ps.tx}">
       <i style="width:6px;height:6px;border-radius:50%;background:${ps.dot};display:inline-block;vertical-align:middle;margin-right:2px"></i>${a}/${needs[p]} ${p}
@@ -297,9 +312,10 @@ async function binCreate(){
   return(await r.json()).metadata.id;
 }
 function applyData(d){
-  if(d.emps)S.emps=d.emps.map(e=>({...e,postes:e.postes||(e.poste?[e.poste]:[POSTES[0]]),heures:e.heures||35}));
+  if(d.emps)S.emps=d.emps.map(e=>({...e,postes:e.postes||(e.poste?[e.poste]:[getPostes().map(p=>p.id)[0]]),heures:e.heures||35}));
   if(d.fc)S.fc=d.fc;
   if(d.par)S.par={...S.par,...d.par};
+  if(d.postesConfig&&d.postesConfig.length)S.postesConfig=d.postesConfig;
   if(d.plan){
     const np={};
     for(const dk in d.plan){np[dk]={};for(const eid in d.plan[dk]){const v=d.plan[dk][eid];np[dk][eid]=Array.isArray(v)?v:(v&&v.s!=null?[v]:[]);}}
@@ -383,7 +399,7 @@ function autoGen(){
   const ranked=[...ds].sort((a,b)=>getTrans(S.fc[iso(b)]||{})-getTrans(S.fc[iso(a)]||{}));
   for(const day of ranked){
     const dk=iso(day);let si=0;
-    POSTES.forEach(poste=>{
+    getPostes().map(p=>p.id).forEach(poste=>{
       const need=(calcNeeds(S.fc[dk]||{}))[poste];if(!need)return;
       const cands=S.emps.filter(e=>(e.postes||[]).includes(poste)&&!np[dk][e.id]?.length&&worked[e.id]<target[e.id])
         .sort((a,b)=>(target[b.id]-worked[b.id])-(target[a.id]-worked[a.id]));
@@ -405,12 +421,51 @@ function addShift(eid,dk){
 }
 function delShift(eid,dk,idx){setShifts(dk,eid,shifts(dk,eid).filter((_,i)=>i!==idx));renderPlanning();}
 function createFirst(eid,dk){const emp=S.emps.find(e=>e.id===eid);setShifts(dk,eid,[{s:11*60+30,e:17*60+30,poste:mainP(emp||{})}]);renderPlanning();}
-function cyclePoste(eid,dk,idx){
-  const arr=shifts(dk,eid);if(!arr[idx])return;
-  const emp=S.emps.find(e=>e.id===eid);if(!emp)return;
-  const ps=(emp.postes||[mainP(emp)]),cur=arr[idx].poste||ps[0];
-  arr[idx].poste=ps[(ps.indexOf(cur)+1)%ps.length];
-  setShifts(dk,eid,arr);renderPlanning();
+function showPostePicker(eid, dk, idx, anchorEl){
+  // Fermer tout picker existant
+  const existing = document.getElementById('poste-picker');
+  if(existing){ existing.remove(); return; }
+  const arr = shifts(dk, eid); if(!arr[idx]) return;
+  const emp = S.emps.find(e=>e.id===eid);
+  const PS_ = getPS();
+  const rect = anchorEl.getBoundingClientRect();
+
+  const picker = document.createElement('div');
+  picker.id = 'poste-picker';
+  picker.style.cssText = `position:fixed;z-index:999;background:#fff;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.18);border:1px solid #E2E8F0;padding:6px;min-width:160px;max-height:300px;overflow-y:auto;`;
+  // Positionnement sous le badge
+  const top = Math.min(rect.bottom + 4, window.innerHeight - 320);
+  picker.style.top = top + 'px';
+  picker.style.left = Math.min(rect.left, window.innerWidth - 180) + 'px';
+
+  const title = document.createElement('div');
+  title.style.cssText = 'font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.5px;padding:3px 6px 5px;border-bottom:1px solid #F1F5F9;margin-bottom:4px';
+  title.textContent = 'Choisir le poste';
+  picker.appendChild(title);
+
+  getPostes().forEach(p => {
+    const ps = PS_[p.id] || {};
+    const cur = arr[idx].poste || mainP(emp||{});
+    const isCur = p.id === cur;
+    const btn = document.createElement('button');
+    btn.style.cssText = `display:flex;align-items:center;gap:8px;width:100%;padding:7px 8px;border:none;border-radius:8px;background:${isCur?ps.bg:'transparent'};cursor:pointer;font-family:inherit;font-size:13px;font-weight:${isCur?700:400};color:${isCur?ps.tx:'#374151'};text-align:left;margin-bottom:2px;`;
+    btn.innerHTML = `<span style="width:9px;height:9px;border-radius:50%;background:${ps.dot||'#94A3B8'};flex-shrink:0;display:inline-block"></span><span>${p.ico||''} ${p.id}</span>${isCur?'<span style="margin-left:auto;font-size:11px">✓</span>':''}`;
+    btn.onclick = () => {
+      arr[idx].poste = p.id;
+      setShifts(dk, eid, arr);
+      picker.remove();
+      renderPlanning();
+    };
+    picker.appendChild(btn);
+  });
+
+  document.body.appendChild(picker);
+  // Fermer si clic ailleurs
+  setTimeout(() => {
+    document.addEventListener('click', function handler(e){
+      if(!picker.contains(e.target)){ picker.remove(); document.removeEventListener('click', handler); }
+    });
+  }, 50);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -464,7 +519,7 @@ function pUp(e){
   if(!DRAG)return;
   const{x,y}=coord(e),d=DRAG;DRAG=null;
   document.body.style.cursor='';
-  if(d.type==='poste'){if(Math.abs(x-d.x0)<8&&Math.abs(y-d.y0)<8){const b=d.el.closest('[data-blk]');if(b)cyclePoste(b.dataset.eid,b.dataset.dk,+b.dataset.idx);}return;}
+  if(d.type==='poste'){if(Math.abs(x-d.x0)<8&&Math.abs(y-d.y0)<8){const b=d.el.closest('[data-blk]');if(b)showPostePicker(b.dataset.eid,b.dataset.dk,+b.dataset.idx,d.el);}return;}
   if(d.type==='click'){if(Math.abs(x-d.x0)<8&&Math.abs(y-d.y0)<8){const rect=d.track.getBoundingClientRect(),cm=snap(clamp(px2m(x-rect.left),TL_S,TL_E-MIN_D));const emp=S.emps.find(e=>e.id===d.eid);setShifts(d.dk,d.eid,[...shifts(d.dk,d.eid),{s:cm,e:Math.min(cm+MIN_D,TL_E),poste:mainP(emp||{})}]);renderPlanning();}return;}
   if(d.moved){const arr=shifts(d.dk,d.eid);if(arr[d.idx]){arr[d.idx].s=d.cs;arr[d.idx].e=d.ce;setShifts(d.dk,d.eid,arr);renderPlanning();}}
 }
@@ -534,7 +589,7 @@ function renderPlanning(){
 }
 
 function buildTimeline(dk){
-  const grp={};POSTES.forEach(p=>{grp[p]=[];});S.emps.forEach(e=>(grp[mainP(e)]||grp[POSTES[0]]).push(e));
+  const grp={};getPostes().map(p=>p.id).forEach(p=>{grp[p]=[];});S.emps.forEach(e=>(grp[mainP(e)]||grp[getPostes().map(p=>p.id)[0]]).push(e));
   const hrs=Array.from({length:19},(_,i)=>i+6);
   // Staff per hour
   const sph=hrs.map(h=>S.emps.filter(e=>shifts(dk,e.id).some(sh=>sh.s<=h*60&&sh.e>h*60)).length);
@@ -558,9 +613,9 @@ function buildTimeline(dk){
     rows=`<div style="text-align:center;padding:40px;color:#94A3B8"><div style="font-size:32px;margin-bottom:8px">👥</div><div style="font-weight:600">Aucun employé — ajoutez-en dans l'onglet Équipe</div></div>`;
   }else{
     let gi=0;
-    POSTES.forEach(poste=>{
+    getPostes().map(p=>p.id).forEach(poste=>{
       const pe=grp[poste]||[];if(!pe.length)return;
-      const ps=PS[poste];
+      const ps=getPS()[poste];
       rows+=`<div class="sec-hdr" style="border-color:${ps.bd}">
         <div class="sec-lbl" style="width:${EC_W}px;color:${ps.tx};border-color:${ps.bd};background:${ps.bg}">
           <span style="width:7px;height:7px;border-radius:50%;background:${ps.dot};flex-shrink:0;display:inline-block"></span>${poste}
@@ -621,7 +676,7 @@ function syncScroll(src){
 function buildBlocks(emp,shs,dk){
   return shs.map((sh,idx)=>{
     const w=m2px(sh.e)-m2px(sh.s),narrow=w<110,vNarrow=w<50;
-    const poste=sh.poste||mainP(emp),ps=PS[poste]||PS[POSTES[0]];
+    const poste=sh.poste||mainP(emp),ps=getPS()[poste]||(getPS()[getPostes()[0].id]||{});
     return`<div id="blk-${emp.id}-${idx}" data-blk="1" data-eid="${emp.id}" data-dk="${dk}" data-idx="${idx}"
       style="position:absolute;left:${m2px(sh.s)}px;width:${w}px;top:${bTop(idx)}px;height:${BH}px;
              background:${ps.bg};border:1.5px solid ${ps.bd};border-radius:8px;display:flex;align-items:stretch;
@@ -656,7 +711,7 @@ function renderTableau(){
   const pills=ds.map(d=>{const dk=iso(d),sel=dk===SEL,we=isWE(d);
     return`<button class="pill${sel?' active':''}${!sel&&we?' we':''}" onclick="SEL='${dk}';renderTableau()">
       <span style="text-transform:capitalize">${fDay(d)}</span></button>`;}).join('');
-  const activeP=POSTES.filter(p=>needs[p]>0||dHrs.some(h=>cAt(p,h)>0));
+  const activeP=getPostes().map(p=>p.id).filter(p=>needs[p]>0||dHrs.some(h=>cAt(p,h)>0));
   let html=`<div class="row mb8" style="gap:8px;flex-wrap:wrap;justify-content:space-between">
     <div><div style="font-size:17px;font-weight:800;color:#0F172A">📊 Tableau de positionnement</div>
     <div style="font-size:12px;color:#64748B;text-transform:capitalize">${new Date(SEL+'T12:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})}</div></div>
@@ -681,7 +736,7 @@ function renderTableau(){
       </tr>
     </thead>
     <tbody>
-      ${activeP.map((poste,pi)=>{const ps=PS[poste],need=needs[poste]||0,rc=dHrs.map(h=>cAt(poste,h)),pk=Math.max(...rc,0);
+      ${activeP.map((poste,pi)=>{const ps=getPS()[poste],need=needs[poste]||0,rc=dHrs.map(h=>cAt(poste,h)),pk=Math.max(...rc,0);
         return`<tr style="border-bottom:1px solid #F1F5F9;background:${pi%2?'#FAFCFF':'#fff'}">
           <td style="padding:8px 10px;position:sticky;left:0;background:${pi%2?'#FAFCFF':'#fff'};z-index:3;border-right:2px solid #E2E8F0">
             <div style="display:flex;align-items:center;gap:6px">
@@ -739,7 +794,7 @@ function renderPosition(){
     return`<button class="pill${sel?' active':''}${!sel&&we?' we':''}" onclick="SEL='${dk}';renderPosition()"><span style="text-transform:capitalize">${fDay(d)}</span></button>`;}).join('');
   function empsByPoste(poste){return S.emps.filter(e=>shifts(SEL,e.id).some(sh=>(sh.poste||mainP(e))===poste));}
   function getHrs(eid,poste){return shifts(SEL,eid).filter(sh=>(sh.poste||mainP(S.emps.find(e=>e.id===eid)||{}))===poste).map(sh=>fT(sh.s)+'–'+fT(sh.e)).join(' ')||shifts(SEL,eid).map(sh=>fT(sh.s)+'–'+fT(sh.e)).join(' ');}
-  function slotHtml(poste,i){const emps=empsByPoste(poste),e=emps[i],ps=PS[poste],dot=CLS[poste];
+  function slotHtml(poste,i){const emps=empsByPoste(poste),e=emps[i],ps=getPS()[poste],dot=CLS[poste];
     return`<div style="border:1.5px solid ${ps.bd};border-radius:6px;padding:5px 7px;min-height:44px;background:${e?ps.bg:'#fff'}">
       <div style="font-size:9px;font-weight:700;color:${ps.dot};text-transform:uppercase;letter-spacing:.3px">${i===0?'Principal':i===1?'Équipier 2':'Renfort '+(i-1)}</div>
       <div style="font-size:11px;font-weight:700;color:${e?ps.tx:'#CBD5E1'};margin-top:1px;min-height:15px;border-bottom:1px solid ${ps.bd}">${e?e.prenom+' '+e.nom:''}</div>
@@ -747,7 +802,7 @@ function renderPosition(){
     </div>`;
   }
   function zoneHtml(zoneName){return ZONES_CFG[zoneName].map(({id:poste,ico,slots,flex,grid2})=>{
-    const ps=PS[poste],dot=CLS[poste],need=calcNeeds(S.fc[SEL]||{})[poste]||0,cnt=empsByPoste(poste).length;
+    const ps=getPS()[poste],dot=CLS[poste],need=calcNeeds(S.fc[SEL]||{})[poste]||0,cnt=empsByPoste(poste).length;
     return`<div style="flex:${flex==='large'?1.6:flex==='small'?.75:1};border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)">
       <div style="padding:5px 9px;background:${dot};display:flex;align-items:center;gap:5px;color:#fff">
         <span style="font-size:13px">${ico}</span><span style="font-size:13px;font-weight:800;flex:1">${poste}</span>
@@ -797,13 +852,13 @@ function printPosition(){const p=document.getElementById('pos-plan');if(!p)retur
 // RENDER EMPLOYEES
 // ═══════════════════════════════════════════════════════════
 function renderEmployes(){
-  const grp={};POSTES.forEach(p=>{grp[p]=[];});S.emps.forEach(e=>(grp[mainP(e)]||grp[POSTES[0]]).push(e));
+  const grp={};getPostes().map(p=>p.id).forEach(p=>{grp[p]=[];});S.emps.forEach(e=>(grp[mainP(e)]||grp[getPostes().map(p=>p.id)[0]]).push(e));
   let html=`<div class="row mb12" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
     <div><div style="font-size:17px;font-weight:800;color:#0F172A">👥 Équipe</div><div style="font-size:12px;color:#64748B">${S.emps.length} employé${S.emps.length!==1?'s':''}</div></div>
     <button class="btn-pri" onclick="openEmpModal()">+ Ajouter</button>
   </div>`;
   let any=false;
-  POSTES.forEach(poste=>{const pe=grp[poste]||[];if(!pe.length)return;any=true;const ps=PS[poste];
+  getPostes().map(p=>p.id).forEach(poste=>{const pe=grp[poste]||[];if(!pe.length)return;any=true;const ps=getPS()[poste];
     html+=`<div style="border-radius:10px;overflow:hidden;border:1px solid ${ps.bd};margin-bottom:10px">
       <div style="padding:5px 12px;background:${ps.bg};font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:${ps.tx};display:flex;align-items:center;gap:6px">
         <span style="width:8px;height:8px;border-radius:50%;background:${ps.dot};display:inline-block"></span>${poste}
@@ -816,7 +871,7 @@ function renderEmployes(){
         <div style="flex:1;min-width:0">
           <div style="font-weight:600;font-size:13px;color:#0F172A">${emp.prenom} ${emp.nom}</div>
           <div style="font-size:11px;color:#64748B">${emp.heures}h/sem</div>
-          ${ex.length?`<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:2px">${ex.map(p=>`<span style="padding:1px 5px;border-radius:10px;font-size:9px;font-weight:600;background:${PS[p]?.bg};color:${PS[p]?.tx};border:1px solid ${PS[p]?.bd}">${p}</span>`).join('')}</div>`:''}
+          ${ex.length?`<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:2px">${ex.map(p=>`<span style="padding:1px 5px;border-radius:10px;font-size:9px;font-weight:600;background:${getPS()[p]?.bg};color:${getPS()[p]?.tx};border:1px solid ${getPS()[p]?.bd}">${p}</span>`).join('')}</div>`:''}
         </div>
         <div style="display:flex;gap:4px">
           <button onclick='openEmpModal(${JSON.stringify(emp)})' style="background:#F1F5F9;border:none;padding:6px 9px;border-radius:7px;font-size:12px">✏️</button>
@@ -828,7 +883,7 @@ function renderEmployes(){
   document.getElementById('tab-employes').innerHTML=html;
 }
 let editEmp=null,mPostes=[];
-function openEmpModal(emp){editEmp=emp||null;mPostes=emp?[...(emp.postes||[])]:[POSTES[0]];buildEmpModal(emp||{});}
+function openEmpModal(emp){editEmp=emp||null;mPostes=emp?[...(emp.postes||[])]:[getPostes().map(p=>p.id)[0]];buildEmpModal(emp||{});}
 function buildEmpModal(e){
   document.getElementById('modal-root').innerHTML=`
     <div class="overlay" onclick="if(event.target===this)closeModal()">
@@ -855,7 +910,7 @@ function buildEmpModal(e){
       </div>
     </div>`;
 }
-function buildPL(){return POSTES.map(p=>{const sel=mPostes.includes(p),ps=PS[p],idx=mPostes.indexOf(p);
+function buildPL(){return getPostes().map(p=>p.id).map(p=>{const sel=mPostes.includes(p),ps=getPS()[p],idx=mPostes.indexOf(p);
   return`<div onclick="toggleP('${p}')" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;border:2px solid ${sel?ps.dot:'#E2E8F0'};background:${sel?ps.bg:'#fff'};cursor:pointer;margin-bottom:4px">
     <span style="width:8px;height:8px;border-radius:50%;background:${ps.dot};flex-shrink:0;display:inline-block"></span>
     <span style="font-size:13px;font-weight:500;flex:1;color:${sel?ps.tx:'#374151'}">${p}</span>
@@ -892,7 +947,7 @@ function renderExport(){
     </div>
   </div>`;
   S.emps.forEach(emp=>{
-    const totMin=ds.reduce((s,d)=>s+dayMin(iso(d),emp.id),0),totH=Math.round(totMin/60*10)/10,ps=PS[mainP(emp)];
+    const totMin=ds.reduce((s,d)=>s+dayMin(iso(d),emp.id),0),totH=Math.round(totMin/60*10)/10,ps=getPS()[mainP(emp)];
     html+=`<div class="card" style="margin-bottom:12px;overflow:hidden">
       <div style="padding:9px 12px;background:${ps.bg};display:flex;align-items:center;gap:9px;border-bottom:1px solid ${ps.bd}">
         <div style="width:36px;height:36px;border-radius:50%;background:#fff;border:2px solid ${ps.bd};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:${ps.tx};flex-shrink:0">
@@ -905,7 +960,7 @@ function renderExport(){
         ${ds.map(d=>{const dk=iso(d),shs=shifts(dk,emp.id),we=isWE(d);
           return`<div style="padding:6px 4px;border-right:1px solid #F1F5F9;min-height:65px;background:${we?'#FAFAFA':'#fff'}">
             <div style="font-size:9px;font-weight:600;color:${we?'#DC2626':'#64748B'};text-transform:capitalize;margin-bottom:3px;text-align:center">${fDay(d)}</div>
-            ${shs.length?shs.map(sh=>{const p=sh.poste||mainP(emp),psp=PS[p]||ps;
+            ${shs.length?shs.map(sh=>{const p=sh.poste||mainP(emp),psp=getPS()[p]||ps;
               return`<div style="text-align:center;margin-bottom:2px;padding:3px;border-radius:5px;background:${psp.bg};border:1px solid ${psp.bd}">
                 <div style="font-size:10px;font-weight:800;color:#0369A1">${fT(sh.s)}–${fT(sh.e)}</div>
                 <div style="font-size:8px;color:#64748B">${fDur(sh.e-sh.s)}</div>
@@ -918,7 +973,7 @@ function renderExport(){
   document.getElementById('tab-export').innerHTML=html;
 }
 function buildPrintEmp(emp){
-  const ds=days(),totH=Math.round(ds.reduce((s,d)=>s+dayMin(iso(d),emp.id),0)/60*10)/10,ps=PS[mainP(emp)];
+  const ds=days(),totH=Math.round(ds.reduce((s,d)=>s+dayMin(iso(d),emp.id),0)/60*10)/10,ps=getPS()[mainP(emp)];
   return`<div class="print-page">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #0EA5E9">
       <div style="font-size:28px">🫙</div>
@@ -931,7 +986,7 @@ function buildPrintEmp(emp){
       ${ds.map(d=>{const dk=iso(d),shs=shifts(dk,emp.id),we=isWE(d);
         return`<div style="border:1px solid #E2E8F0;border-radius:5px;padding:7px 5px;min-height:85px;background:${we?'#FAFAFA':'#fff'}">
           <div style="font-size:10px;font-weight:700;color:${we?'#DC2626':'#374151'};text-align:center;margin-bottom:3px;text-transform:capitalize">${fDay(d)}</div>
-          ${shs.length?shs.map(sh=>{const p=sh.poste||mainP(emp),psp=PS[p]||ps;
+          ${shs.length?shs.map(sh=>{const p=sh.poste||mainP(emp),psp=getPS()[p]||ps;
             return`<div style="margin-bottom:3px;padding:4px;border-radius:4px;background:${psp.bg};text-align:center">
               <div style="font-size:12px;font-weight:800;color:#0369A1">${fT(sh.s)}–${fT(sh.e)}</div>
               <div style="font-size:9px;color:#64748B">${fDur(sh.e-sh.s)}</div>
@@ -970,7 +1025,7 @@ function renderParams(){
           {k:'seuilBar',   l:'Bar à partir de',        u:'€ CA',       p:'Bar'},
         ].map(({k,l,u,p:poste})=>`
           <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;border:1px solid #F1F5F9;background:#FAFAFA;margin-bottom:5px">
-            <span style="width:8px;height:8px;border-radius:50%;background:${PS[poste].dot};flex-shrink:0;display:inline-block"></span>
+            <span style="width:8px;height:8px;border-radius:50%;background:${getPS()[poste].dot};flex-shrink:0;display:inline-block"></span>
             <div style="flex:1"><div style="font-size:12px;font-weight:500;color:#374151">${l}</div><div style="font-size:10px;color:#94A3B8">${u}</div></div>
             <input type="number" value="${p[k]||0}" min="1" id="pr-${k}" style="width:66px;padding:5px 7px;border:1px solid #E2E8F0;border-radius:7px;font-size:14px;font-weight:700;text-align:center;color:#0F172A;outline:none">
           </div>`).join('')}
@@ -982,12 +1037,121 @@ function renderParams(){
         <button onclick="binSave()" class="btn-sec" style="width:100%;padding:9px;border-radius:8px;font-size:13px;margin-bottom:7px">🔄 Synchroniser maintenant</button>
         <button onclick="resetAccount()" style="width:100%;padding:9px;border-radius:8px;background:#FFF1F2;border:1px solid #FECDD3;color:#9F1239;cursor:pointer;font-size:13px">🔑 Changer de compte</button>
       </div>
+
+      <!-- Gestion des postes -->
+      <div class="card" style="padding:14px;margin-top:10px">
+        <div style="font-size:15px;font-weight:800;color:#0F172A;margin-bottom:3px">🏷️ Gestion des postes</div>
+        <div style="font-size:11px;color:#94A3B8;margin-bottom:12px">Créez, renommez et colorez vos postes. Ils apparaîtront dans les créneaux et les menus déroulants.</div>
+        <div id="postes-list">${buildPostesList()}</div>
+        <button onclick="openPosteModal()" style="width:100%;margin-top:8px;padding:10px;border-radius:9px;background:#F0F9FF;border:2px dashed #BAE6FD;color:#0369A1;font-size:13px;font-weight:700;cursor:pointer">＋ Ajouter un poste</button>
+      </div>
     </div>`;
 }
 function saveParams(){
   ['ratioMoule','ratioSalle','ratioFrite','seuilPlo','seuilBar','ticketMoyen'].forEach(k=>{const el=document.getElementById('pr-'+k);if(el)S.par[k]=+el.value||0;});
   autoSave();
   const b=document.getElementById('spb');if(b){b.textContent='✓ Enregistré';b.style.background='#16A34A';setTimeout(()=>{b.textContent='💾 Enregistrer';b.style.background='';},2000);}
+}
+
+// ── Gestion postes ───────────────────────────────────────
+function buildPostesList(){
+  const PS_=getPS();
+  return getPostes().map((p,i)=>{
+    const ps=PS_[p.id]||{};
+    const col=COLOR_PALETTE.find(c=>c.key===p.color)||COLOR_PALETTE[0];
+    return`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;border:1px solid ${ps.bd||'#E2E8F0'};background:${ps.bg||'#fff'};margin-bottom:5px">
+      <span style="font-size:16px">${p.ico||'📌'}</span>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:700;color:${ps.tx||'#374151'}">${p.id}</div>
+        <div style="font-size:10px;color:${ps.dot||'#94A3B8'}">${col.label}</div>
+      </div>
+      <div style="display:flex;gap:5px">
+        ${i>0?`<button onclick="movePoste(${i},-1)" style="background:#F1F5F9;border:none;padding:5px 8px;border-radius:6px;font-size:12px;cursor:pointer">↑</button>`:'<span style="width:32px"></span>'}
+        ${i<getPostes().length-1?`<button onclick="movePoste(${i},1)" style="background:#F1F5F9;border:none;padding:5px 8px;border-radius:6px;font-size:12px;cursor:pointer">↓</button>`:'<span style="width:32px"></span>'}
+        <button onclick='openPosteModal(${i})' style="background:#F1F5F9;border:none;padding:5px 8px;border-radius:6px;font-size:13px;cursor:pointer">✏️</button>
+        ${getPostes().length>1?`<button onclick="delPoste(${i})" style="background:#FFF1F2;border:none;padding:5px 8px;border-radius:6px;font-size:13px;color:#BE123C;cursor:pointer">🗑️</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function movePoste(i,dir){
+  const p=getPostes(),j=i+dir;
+  if(j<0||j>=p.length)return;
+  [p[i],p[j]]=[p[j],p[i]];
+  S.postesConfig=[...p];
+  autoSave();
+  const el=document.getElementById('postes-list');if(el)el.innerHTML=buildPostesList();
+}
+
+function delPoste(i){
+  const p=getPostes();
+  if(p.length<=1){alert('Il faut au moins un poste.');return;}
+  if(!confirm(`Supprimer le poste "${p[i].id}" ?`))return;
+  S.postesConfig=p.filter((_,idx)=>idx!==i);
+  autoSave();
+  const el=document.getElementById('postes-list');if(el)el.innerHTML=buildPostesList();
+}
+
+let editPosteIdx=null;
+function openPosteModal(i){
+  editPosteIdx=(i!=null)?i:null;
+  const p=(i!=null)?getPostes()[i]:{id:'',ico:'📌',color:'blue'};
+  document.getElementById('modal-root').innerHTML=`
+    <div class="overlay" onclick="if(event.target===this)closeModal()">
+      <div class="modal">
+        <div class="modal-hdr"><span>🏷️</span><span>${i!=null?'Modifier le poste':'Nouveau poste'}</span></div>
+        <div class="modal-body">
+          <div style="display:grid;grid-template-columns:80px 1fr;gap:10px">
+            <div><label class="fld-lbl">Icône</label><input class="fld-inp" id="p-ico" type="text" value="${p.ico||'📌'}" style="font-size:20px;text-align:center"></div>
+            <div><label class="fld-lbl">Nom du poste *</label><input class="fld-inp" id="p-nom" type="text" value="${i!=null?p.id:''}" placeholder="ex: Caisse, Runner…"></div>
+          </div>
+          <div>
+            <label class="fld-lbl">Couleur</label>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:4px" id="color-grid">
+              ${COLOR_PALETTE.map(c=>`
+                <div onclick="selectColor('${c.key}')" id="col-${c.key}"
+                  style="padding:8px 6px;border-radius:8px;border:2px solid ${c.key===p.color?c.dot:'#E2E8F0'};background:${c.bg};cursor:pointer;text-align:center;transition:all .12s">
+                  <div style="width:16px;height:16px;border-radius:50%;background:${c.dot};margin:0 auto 3px"></div>
+                  <div style="font-size:10px;font-weight:600;color:${c.tx}">${c.label}</div>
+                </div>`).join('')}
+            </div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button onclick="closeModal()" style="padding:9px 16px;border-radius:8px;border:1px solid #E2E8F0;background:#fff;font-size:13px">Annuler</button>
+          <button onclick="savePoste()" class="btn-pri">${i!=null?'Enregistrer':'Ajouter ✓'}</button>
+        </div>
+      </div>
+    </div>`;
+  window._selectedColor=p.color||'blue';
+}
+
+function selectColor(key){
+  window._selectedColor=key;
+  document.querySelectorAll('[id^="col-"]').forEach(el=>{
+    const k=el.id.replace('col-','');
+    const c=COLOR_PALETTE.find(x=>x.key===k);
+    el.style.borderColor=k===key?c.dot:'#E2E8F0';
+  });
+}
+
+function savePoste(){
+  const nom=(document.getElementById('p-nom').value||'').trim();
+  const ico=(document.getElementById('p-ico').value||'📌').trim();
+  if(!nom){alert('Le nom est requis.');return;}
+  const color=window._selectedColor||'blue';
+  const postes=getPostes();
+  if(editPosteIdx!=null){
+    postes[editPosteIdx]={...postes[editPosteIdx],id:nom,ico,color};
+  }else{
+    if(postes.find(p=>p.id===nom)){alert('Ce poste existe déjà.');return;}
+    postes.push({id:nom,ico,color});
+  }
+  S.postesConfig=[...postes];
+  autoSave();closeModal();
+  const el=document.getElementById('postes-list');if(el)el.innerHTML=buildPostesList();
+  if(curTab==='planning')renderPlanning();
 }
 
 // ═══════════════════════════════════════════════════════════

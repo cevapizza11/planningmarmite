@@ -168,7 +168,7 @@ let S={
   postesConfig:[...DEFAULT_POSTES]
 };
 let MON=monday(new Date()),SEL=iso(new Date()),curTab='planning';
-let saveT=null,DRAG=null,_unsub=null;
+let saveT=null,DRAG=null,_unsub=null,_unsubEmps=null;
 
 // ═══════════════════════════════════
 // UTILS
@@ -290,13 +290,14 @@ function dot(s){const d=document.getElementById('sync-dot');if(d)d.style.backgro
 function autoSave(){clearTimeout(saveT);saveT=setTimeout(dbSave,1500);}
 function dbSave(){
   dot('sync');
-  DOCREF.set(S)
+  const {emps,...rest}=S;
+  DOCREF.set(rest)
     .then(()=>dot('ok'))
     .catch(e=>{console.error('Save:',e);dot('err');});
 }
 function applyData(d){
   if(!d)return;
-  if(d.emps)S.emps=d.emps.map(e=>({...e,postes:e.postes||(e.poste?[e.poste]:[getPostes()[0].id]),heures:e.heures||35}));
+  // emps now come from the shared 'employees' collection, not from planning state
   if(d.fc)S.fc=d.fc;
   if(d.par)S.par={...S.par,...d.par};
   if(d.postesConfig&&d.postesConfig.length)S.postesConfig=d.postesConfig;
@@ -318,11 +319,13 @@ function init(){
       dot('ok');
       startApp();
       startSync();
+      listenEmployees();
     })
     .catch(e=>{
       console.error('Init:',e);
       dot('err');
       startApp();
+      listenEmployees();
     });
 }
 function startApp(){
@@ -341,6 +344,33 @@ function startSync(){
       if(curTab)refreshTab();
     }
   },e=>{console.error('Sync:',e);dot('err');});
+}
+function listenEmployees(){
+  if(_unsubEmps)_unsubEmps();
+  _unsubEmps=db.collection('employees').where('active','==',true).orderBy('name')
+    .onSnapshot(snap=>{
+      S.emps=snap.docs.map(d=>{
+        const data=d.data();
+        const parts=(data.name||'').trim().split(' ');
+        const prenom=parts[0]||'';
+        const nom=parts.slice(1).join(' ')||'';
+        return {
+          id:d.id,
+          prenom,
+          nom,
+          postes:data.postes||(data.poste?[data.poste]:[getPostes()[0]?.id||'service']),
+          heures:data.contractHours||data.heures||35,
+          actif:true,
+          // keep extra pointeuse fields so we don't lose them on save
+          _name:data.name,
+          _pinHash:data.pinHash,
+          _plannedTime:data.plannedTime,
+          _contractType:data.contractType,
+          _createdAt:data.createdAt
+        };
+      });
+      if(curTab)refreshTab();
+    },e=>console.error('Employees listener:',e));
 }
 function refreshTab(){
   if(curTab==='planning')renderPlanning();
@@ -827,12 +857,39 @@ function saveEmp(){
   const prenom=(document.getElementById('mp').value||'').trim(),nom=(document.getElementById('mn').value||'').trim();
   if(!prenom||!nom){alert('Prénom et Nom requis.');return;}
   if(!mPostes.length){alert('Sélectionnez au moins un poste.');return;}
-  const heures=+document.getElementById('mh').value||35,id=editEmp?.id||uid();
-  const emp={id,prenom,nom,postes:[...mPostes],heures,actif:true};
-  S.emps=editEmp?.id?S.emps.map(e=>e.id===id?emp:e):[...S.emps,emp];
-  autoSave();closeModal();renderEmployes();
+  const heures=+document.getElementById('mh').value||35;
+  const name=nom?`${prenom} ${nom}`:prenom;
+  if(editEmp?.id){
+    // update existing employee
+    const existing=editEmp;
+    db.collection('employees').doc(editEmp.id).update({
+      name,
+      postes:[...mPostes],
+      contractHours:heures,
+      // preserve pointeuse fields
+      ...(existing._contractType?{contractType:existing._contractType}:{}),
+      ...(existing._plannedTime!=null?{plannedTime:existing._plannedTime}:{}),
+    }).catch(e=>alert('Erreur sauvegarde: '+e.message));
+  } else {
+    // create new employee in shared collection
+    db.collection('employees').add({
+      name,
+      postes:[...mPostes],
+      contractHours:heures,
+      contractType:'CDI',
+      plannedTime:heures,
+      active:true,
+      pinHash:null,
+      createdAt:firebase.firestore.Timestamp.now()
+    }).catch(e=>alert('Erreur création: '+e.message));
+  }
+  closeModal();
 }
-function delEmp(id){if(!confirm('Supprimer cet employé ?'))return;S.emps=S.emps.filter(e=>e.id!==id);autoSave();renderEmployes();}
+function delEmp(id){
+  if(!confirm('Supprimer cet employé ? (aussi dans la pointeuse)'))return;
+  db.collection('employees').doc(id).update({active:false})
+    .catch(e=>alert('Erreur suppression: '+e.message));
+}
 
 // ═══════════════════════════════════
 // EXPORT

@@ -58,6 +58,28 @@ button,input,select,textarea{font-family:inherit;cursor:pointer}
 ::-webkit-scrollbar{height:6px;width:5px}
 ::-webkit-scrollbar-track{background:#F1F5F9}
 ::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:3px}
+/* ── RH MODULE ── */
+.rh-tabs{display:flex;border-bottom:2px solid #E2E8F0;margin-bottom:14px;gap:0}
+.rh-tab{flex:1;padding:10px 4px;text-align:center;font-size:12px;font-weight:600;color:#94A3B8;border:none;background:none;border-bottom:3px solid transparent;cursor:pointer;margin-bottom:-2px}
+.rh-tab.active{color:#0EA5E9;border-bottom-color:#0EA5E9}
+.rh-section{display:flex;flex-direction:column;gap:10px}
+.rh-card{background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:14px}
+.rh-card-title{font-size:11px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field-row.full{grid-template-columns:1fr}
+.dispo-grid{display:grid;grid-template-columns:auto 1fr 1fr 1fr;gap:6px;align-items:center}
+.dispo-day{font-size:11px;font-weight:700;color:#374151;padding-right:6px}
+.dispo-slot{display:flex;align-items:center;justify-content:center;padding:7px 4px;border-radius:8px;border:2px solid #E2E8F0;background:#F8FAFC;cursor:pointer;font-size:10px;font-weight:700;color:#94A3B8;text-align:center;transition:all .15s;user-select:none}
+.dispo-slot.on{border-color:#22C55E;background:#F0FDF4;color:#15803D}
+.dispo-slot.off{border-color:#FCA5A5;background:#FFF1F2;color:#BE123C}
+.contract-badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700}
+.emp-detail-header{background:linear-gradient(135deg,#0EA5E9,#0369A1);color:#fff;padding:16px;display:flex;align-items:center;gap:12px;border-radius:20px 20px 0 0}
+.emp-avatar-lg{width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;flex-shrink:0}
+.tag-select{width:100%;padding:9px 11px;border:1px solid #E2E8F0;border-radius:9px;font-size:13px;color:#0F172A;outline:none;background:#fff}
+.alert-chr{display:flex;gap:8px;padding:8px 12px;border-radius:8px;font-size:12px;line-height:1.4}
+.alert-chr.warn{background:#FFFBEB;border:1px solid #FCD34D;color:#92400E}
+.alert-chr.ok{background:#F0FDF4;border:1px solid #86EFAC;color:#14532D}
+.alert-chr.info{background:#F0F9FF;border:1px solid #BAE6FD;color:#0369A1}
 </style>
 </head>
 <body>
@@ -79,7 +101,7 @@ button,input,select,textarea{font-family:inherit;cursor:pointer}
       <div style="font-size:9px;opacity:.7;letter-spacing:.8px">PLANIFICATION DU PERSONNEL</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
-      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.04/10/2026 20:00</div>
+      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.05/10/2026 08:00</div>
       <div id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:#FCD34D;transition:background .3s" title="Sync Firebase"></div>
     </div>
   </div>
@@ -89,6 +111,7 @@ button,input,select,textarea{font-family:inherit;cursor:pointer}
     <button class="nav-btn" onclick="showTab('position')"><span class="ico">📋</span>Position</button>
     <button class="nav-btn" onclick="showTab('employes')"><span class="ico">👥</span>Équipe</button>
     <button class="nav-btn" onclick="showTab('export')"><span class="ico">📄</span>Export</button>
+    <button class="nav-btn" onclick="showTab('rh')"><span class="ico">🗂️</span>RH</button>
     <button class="nav-btn" onclick="showTab('params')"><span class="ico">⚙️</span>Params</button>
   </nav>
   <div class="main">
@@ -97,6 +120,7 @@ button,input,select,textarea{font-family:inherit;cursor:pointer}
     <div id="tab-position" style="display:none"></div>
     <div id="tab-employes" style="display:none"></div>
     <div id="tab-export"   style="display:none"></div>
+    <div id="tab-rh"      style="display:none"></div>
     <div id="tab-params"   style="display:none"></div>
   </div>
 </div>
@@ -168,7 +192,7 @@ let S={
   postesConfig:[...DEFAULT_POSTES]
 };
 let MON=monday(new Date()),SEL=iso(new Date()),curTab='planning';
-let saveT=null,DRAG=null,_unsub=null,_unsubEmps=null;
+let saveT=null,DRAG=null,_unsub=null,_unsubEmps=null,_rhEmpTab='identite';
 
 // ═══════════════════════════════════
 // UTILS
@@ -366,7 +390,17 @@ function listenEmployees(){
           _pinHash:data.pinHash,
           _plannedTime:data.plannedTime,
           _contractType:data.contractType,
-          _createdAt:data.createdAt
+          _createdAt:data.createdAt,
+          // RH fields
+          phone:data.phone||'',
+          email:data.email||'',
+          address:data.address||'',
+          contractStart:data.contractStart||null,
+          contractEnd:data.contractEnd||null,
+          grossSalary:data.grossSalary||null,
+          trialEndDate:data.trialEndDate||null,
+          dispo:data.dispo||{lun:{mat:true,am:true,soir:true},mar:{mat:true,am:true,soir:true},mer:{mat:true,am:true,soir:true},jeu:{mat:true,am:true,soir:true},ven:{mat:true,am:true,soir:true},sam:{mat:true,am:true,soir:true},dim:{mat:false,am:false,soir:false}},
+          dispoNotes:data.dispoNotes||''
         };
       });
       if(curTab)refreshTab();
@@ -377,13 +411,14 @@ function refreshTab(){
   else if(curTab==='tableau')renderTableau();
   else if(curTab==='position')renderPosition();
   else if(curTab==='employes')renderEmployes();
+  else if(curTab==='rh')renderRH();
   else if(curTab==='export')renderExport();
 }
 
 // ═══════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════
-const TABS=['planning','tableau','position','employes','export','params'];
+const TABS=['planning','tableau','position','employes','rh','export','params'];
 function showTab(t){
   curTab=t;
   TABS.forEach(k=>{document.getElementById('tab-'+k).style.display=k===t?'':'none';});
@@ -780,6 +815,295 @@ function renderPosition(){
 function printPosition(){const p=document.getElementById('pos-plan');if(!p)return;doPrint(`<div class="print-page">${p.outerHTML}</div>`);}
 
 // ═══════════════════════════════════
+// MODULE RH
+// ═══════════════════════════════════
+const JOURS=[{k:'lun',l:'Lun'},{k:'mar',l:'Mar'},{k:'mer',l:'Mer'},{k:'jeu',l:'Jeu'},{k:'ven',l:'Ven'},{k:'sam',l:'Sam'},{k:'dim',l:'Dim'}];
+const SLOTS=[{k:'mat',l:'Matin'},{k:'am',l:'A-midi'},{k:'soir',l:'Soir'}];
+const CONTRACT_TYPES=['CDI','CDD','Extra','Apprenti','Saisonnier','Stage'];
+const CONTRACT_COLORS={CDI:'#14532D',CDD:'#1E40AF',Extra:'#7C2D12',Apprenti:'#581C87',Saisonnier:'#0C4A6E',Stage:'#374151'};
+const CONTRACT_BG={CDI:'#DCFCE7',CDD:'#DBEAFE',Extra:'#FFEDD5',Apprenti:'#F3E8FF',Saisonnier:'#E0F2FE',Stage:'#F1F5F9'};
+
+function renderRH(){
+  const el=document.getElementById('tab-rh');
+  if(!el)return;
+  if(!S.emps.length){
+    el.innerHTML=`<div style="text-align:center;padding:50px;background:#fff;border-radius:12px;color:#94A3B8;border:1px dashed #E2E8F0"><div style="font-size:44px;margin-bottom:8px">🗂️</div><div style="font-weight:700;font-size:14px;color:#374151;margin-bottom:3px">Aucun employé</div><div style="font-size:12px">Ajoutez des employés dans l'onglet Équipe</div></div>`;
+    return;
+  }
+  let html=`<div style="font-size:17px;font-weight:800;color:#0F172A;margin-bottom:12px">🗂️ Gestion RH</div>`;
+  // Alerts CHR
+  const alerts=getCHRAlerts();
+  if(alerts.length){
+    html+=`<div style="margin-bottom:12px;display:flex;flex-direction:column;gap:6px">${alerts.map(a=>`<div class="alert-chr ${a.type}"><span>${a.ico}</span><span>${a.msg}</span></div>`).join('')}</div>`;
+  }
+  // Employee cards
+  html+=`<div style="display:flex;flex-direction:column;gap:8px">`;
+  S.emps.forEach(emp=>{
+    const ct=emp._contractType||'CDI';
+    const ctColor=CONTRACT_COLORS[ct]||'#374151';
+    const ctBg=CONTRACT_BG[ct]||'#F1F5F9';
+    const dispoCount=JOURS.filter(j=>SLOTS.some(s=>emp.dispo?.[j.k]?.[s.k])).length;
+    html+=`<div class="card" style="padding:12px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="openFicheRH('${emp.id}')">
+      <div style="width:42px;height:42px;border-radius:50%;background:${ctBg};border:2px solid ${ctColor};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:${ctColor};flex-shrink:0">${(emp.prenom?.[0]||'?').toUpperCase()}${(emp.nom?.[0]||'').toUpperCase()}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:13px;color:#0F172A">${emp.prenom} ${emp.nom}</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:3px">
+          <span style="padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;background:${ctBg};color:${ctColor}">${ct}</span>
+          <span style="font-size:11px;color:#64748B">${emp.heures}h/sem</span>
+          <span style="font-size:11px;color:#64748B">📅 ${dispoCount}j/7</span>
+          ${emp.phone?`<span style="font-size:11px;color:#64748B">📞 ${emp.phone}</span>`:''}
+        </div>
+      </div>
+      <div style="color:#94A3B8;font-size:18px">›</div>
+    </div>`;
+  });
+  html+=`</div>`;
+  el.innerHTML=html;
+}
+
+function getCHRAlerts(){
+  const alerts=[];
+  const now=new Date();
+  S.emps.forEach(emp=>{
+    // CDD arrivant à échéance dans 30 jours
+    if((emp._contractType==='CDD')&&emp.contractEnd){
+      const end=emp.contractEnd.toDate?emp.contractEnd.toDate():new Date(emp.contractEnd);
+      const diff=Math.ceil((end-now)/86400000);
+      if(diff<=30&&diff>0) alerts.push({type:'warn',ico:'⚠️',msg:`${emp.prenom} ${emp.nom} — CDD se termine dans ${diff} jour${diff>1?'s':''} (${end.toLocaleDateString('fr-FR')})`});
+      if(diff<=0) alerts.push({type:'warn',ico:'🔴',msg:`${emp.prenom} ${emp.nom} — CDD expiré depuis ${Math.abs(diff)} jour${Math.abs(diff)>1?'s':''}`});
+    }
+    // Période d'essai
+    if(emp.trialEndDate){
+      const te=emp.trialEndDate.toDate?emp.trialEndDate.toDate():new Date(emp.trialEndDate);
+      const diff=Math.ceil((te-now)/86400000);
+      if(diff>0&&diff<=14) alerts.push({type:'info',ico:'📋',msg:`${emp.prenom} ${emp.nom} — Période d'essai se termine dans ${diff} jour${diff>1?'s':''}`});
+    }
+  });
+  return alerts;
+}
+
+function openFicheRH(empId){
+  const emp=S.emps.find(e=>e.id===empId);
+  if(!emp)return;
+  _rhEmpTab='identite';
+  buildFicheRH(emp);
+}
+
+function buildFicheRH(emp){
+  const ct=emp._contractType||'CDI';
+  const ctColor=CONTRACT_COLORS[ct]||'#374151';
+  const ctBg=CONTRACT_BG[ct]||'#F1F5F9';
+  document.getElementById('modal-root').innerHTML=`
+    <div class="overlay" onclick="if(event.target===this)closeModal()">
+      <div class="modal" style="max-height:96vh">
+        <div class="emp-detail-header">
+          <div class="emp-avatar-lg">${(emp.prenom?.[0]||'?').toUpperCase()}${(emp.nom?.[0]||'').toUpperCase()}</div>
+          <div style="flex:1">
+            <div style="font-weight:800;font-size:16px">${emp.prenom} ${emp.nom}</div>
+            <div style="font-size:11px;opacity:.8;margin-top:2px">${emp.heures}h/sem · <span style="background:rgba(255,255,255,.2);padding:2px 8px;border-radius:10px">${ct}</span></div>
+          </div>
+          <button onclick="closeModal()" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:30px;height:30px;border-radius:50%;font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer">✕</button>
+        </div>
+        <div style="padding:0 14px;background:#fff;border-bottom:1px solid #E2E8F0">
+          <div class="rh-tabs">
+            <button class="rh-tab ${_rhEmpTab==='identite'?'active':''}" onclick="switchRHTab('${emp.id}','identite')">👤 Identité</button>
+            <button class="rh-tab ${_rhEmpTab==='contrat'?'active':''}" onclick="switchRHTab('${emp.id}','contrat')">📋 Contrat</button>
+            <button class="rh-tab ${_rhEmpTab==='dispo'?'active':''}" onclick="switchRHTab('${emp.id}','dispo')">🗓️ Dispos</button>
+          </div>
+        </div>
+        <div class="modal-body" id="rh-tab-body">
+          ${buildRHTabContent(emp)}
+        </div>
+      </div>
+    </div>`;
+}
+
+function switchRHTab(empId,tab){
+  _rhEmpTab=tab;
+  const emp=S.emps.find(e=>e.id===empId);
+  if(!emp)return;
+  // update active tabs
+  document.querySelectorAll('.rh-tab').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('rh-tab-body').innerHTML=buildRHTabContent(emp);
+}
+
+function buildRHTabContent(emp){
+  if(_rhEmpTab==='identite') return buildTabIdentite(emp);
+  if(_rhEmpTab==='contrat')  return buildTabContrat(emp);
+  if(_rhEmpTab==='dispo')    return buildTabDispo(emp);
+  return '';
+}
+
+function buildTabIdentite(emp){
+  return`<div class="rh-section">
+    <div class="rh-card">
+      <div class="rh-card-title">Informations personnelles</div>
+      <div class="field-row">
+        <div><label class="fld-lbl">Prénom *</label><input class="fld-inp" id="rh-prenom" value="${emp.prenom||''}"></div>
+        <div><label class="fld-lbl">Nom *</label><input class="fld-inp" id="rh-nom" value="${emp.nom||''}"></div>
+      </div>
+      <div class="field-row full" style="margin-top:10px">
+        <div><label class="fld-lbl">Téléphone</label><input class="fld-inp" id="rh-phone" type="tel" value="${emp.phone||''}" placeholder="06 xx xx xx xx"></div>
+      </div>
+      <div class="field-row full" style="margin-top:10px">
+        <div><label class="fld-lbl">Email</label><input class="fld-inp" id="rh-email" type="email" value="${emp.email||''}" placeholder="prenom@exemple.com"></div>
+      </div>
+      <div class="field-row full" style="margin-top:10px">
+        <div><label class="fld-lbl">Adresse</label><input class="fld-inp" id="rh-address" value="${emp.address||''}" placeholder="Rue, ville..."></div>
+      </div>
+    </div>
+    <div class="modal-foot" style="position:static;border-top:none;padding:0">
+      <button onclick="closeModal()" class="btn-sec">Annuler</button>
+      <button onclick="saveIdentite('${emp.id}')" class="btn-pri">💾 Enregistrer</button>
+    </div>
+  </div>`;
+}
+
+function buildTabContrat(emp){
+  const fmtDate=ts=>{if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);return d.toISOString().split('T')[0];};
+  return`<div class="rh-section">
+    <div class="rh-card">
+      <div class="rh-card-title">Type de contrat</div>
+      <select class="tag-select" id="rh-ctype">
+        ${CONTRACT_TYPES.map(t=>`<option value="${t}" ${(emp._contractType||'CDI')===t?'selected':''}>${t}</option>`).join('')}
+      </select>
+      <div style="margin-top:10px"><label class="fld-lbl">Heures contractuelles / semaine</label>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+          ${[20,25,30,35].map(h=>`<button class="h-btn${(emp.heures||35)===h?' sel':''}" id="hb${h}" onclick="setH(${h})">${h}h</button>`).join('')}
+          <input type="number" id="mh" value="${emp.heures||35}" min="1" max="48" oninput="syncH(this.value)" style="width:56px;padding:6px 8px;border:1px solid #E2E8F0;border-radius:7px;font-size:13px;text-align:center;outline:none">h
+        </div>
+      </div>
+    </div>
+    <div class="rh-card">
+      <div class="rh-card-title">Dates</div>
+      <div class="field-row">
+        <div><label class="fld-lbl">Date d'entrée</label><input class="fld-inp" id="rh-cstart" type="date" value="${fmtDate(emp.contractStart)}"></div>
+        <div><label class="fld-lbl">Fin de période d'essai</label><input class="fld-inp" id="rh-trial" type="date" value="${fmtDate(emp.trialEndDate)}"></div>
+      </div>
+      <div id="cdd-block" style="${(emp._contractType||'CDI')==='CDD'?'':'display:none'};margin-top:10px">
+        <label class="fld-lbl">Fin de CDD</label>
+        <input class="fld-inp" id="rh-cend" type="date" value="${fmtDate(emp.contractEnd)}">
+      </div>
+    </div>
+    <div class="rh-card">
+      <div class="rh-card-title">Rémunération</div>
+      <div class="field-row">
+        <div><label class="fld-lbl">Salaire brut mensuel (€)</label><input class="fld-inp" id="rh-salary" type="number" value="${emp.grossSalary||''}" placeholder="1800"></div>
+        <div style="display:flex;flex-direction:column;justify-content:flex-end">
+          <div style="font-size:10px;color:#94A3B8;margin-bottom:4px">Net estimé</div>
+          <div style="font-size:16px;font-weight:700;color:#0F172A" id="rh-net">${emp.grossSalary?Math.round(emp.grossSalary*0.78)+'€':'—'}</div>
+        </div>
+      </div>
+    </div>
+    <div class="rh-card">
+      <div class="rh-card-title">Postes</div>
+      <div id="mpl">${buildPL()}</div>
+    </div>
+    <div class="alert-chr info"><span>ℹ️</span><span>Convention collective HCR (n°3292). Salaire minimum : SMIC hôtelier. Majoration heures sup. : +25% de 36h à 43h, +50% au-delà.</span></div>
+    <div class="modal-foot" style="position:static;border-top:none;padding:0">
+      <button onclick="closeModal()" class="btn-sec">Annuler</button>
+      <button onclick="saveContrat('${emp.id}')" class="btn-pri">💾 Enregistrer</button>
+    </div>
+  </div>
+  <script>document.getElementById('rh-ctype').addEventListener('change',function(){document.getElementById('cdd-block').style.display=this.value==='CDD'?'':'none';});
+  document.getElementById('rh-salary').addEventListener('input',function(){const n=Math.round(this.value*0.78);document.getElementById('rh-net').textContent=this.value?n+'€':'—';});<\/script>`;
+}
+
+function buildTabDispo(emp){
+  const d=emp.dispo||{};
+  let grid=`<div class="dispo-grid">
+    <div></div>
+    ${SLOTS.map(s=>`<div style="font-size:10px;font-weight:700;color:#64748B;text-align:center">${s.l}</div>`).join('')}`;
+  JOURS.forEach(j=>{
+    const jd=d[j.k]||{mat:false,am:false,soir:false};
+    const isWE=j.k==='sam'||j.k==='dim';
+    grid+=`<div class="dispo-day" style="${isWE?'color:#DC2626':''}">${j.l}</div>`;
+    SLOTS.forEach(s=>{
+      const on=jd[s.k]===true;
+      grid+=`<div class="dispo-slot ${on?'on':'off'}" id="ds-${j.k}-${s.k}" onclick="toggleDispo('${j.k}','${s.k}')">${on?'✓':'✗'}</div>`;
+    });
+  });
+  grid+=`</div>`;
+  return`<div class="rh-section">
+    <div class="rh-card">
+      <div class="rh-card-title">Disponibilités habituelles</div>
+      <div style="font-size:11px;color:#64748B;margin-bottom:10px">Cochez les créneaux où l'employé est disponible</div>
+      ${grid}
+    </div>
+    <div class="rh-card">
+      <div class="rh-card-title">Notes sur les disponibilités</div>
+      <textarea class="fld-inp" id="rh-dispo-notes" rows="3" placeholder="Ex : pas disponible les mercredis soirs en hiver, préfère les midis...">${emp.dispoNotes||''}</textarea>
+    </div>
+    <div class="modal-foot" style="position:static;border-top:none;padding:0">
+      <button onclick="closeModal()" class="btn-sec">Annuler</button>
+      <button onclick="saveDispo('${emp.id}')" class="btn-pri">💾 Enregistrer</button>
+    </div>
+  </div>`;
+}
+
+let _tmpDispo={};
+function toggleDispo(jour,slot){
+  if(!_tmpDispo[jour])_tmpDispo[jour]={mat:false,am:false,soir:false};
+  const el=document.getElementById(`ds-${jour}-${slot}`);
+  const emp=S.emps.find(e=>document.getElementById('modal-root').innerHTML.includes(e.id));
+  // read current state from DOM
+  const isOn=el.classList.contains('on');
+  _tmpDispo[jour][slot]=!isOn;
+  el.classList.toggle('on',!isOn);
+  el.classList.toggle('off',isOn);
+  el.textContent=!isOn?'✓':'✗';
+}
+
+function saveIdentite(empId){
+  const prenom=(document.getElementById('rh-prenom').value||'').trim();
+  const nom=(document.getElementById('rh-nom').value||'').trim();
+  if(!prenom||!nom){alert('Prénom et Nom requis.');return;}
+  const phone=document.getElementById('rh-phone').value.trim();
+  const email=document.getElementById('rh-email').value.trim();
+  const address=document.getElementById('rh-address').value.trim();
+  const name=`${prenom} ${nom}`;
+  db.collection('employees').doc(empId).update({name,phone,email,address})
+    .then(()=>{closeModal();renderRH();})
+    .catch(e=>alert('Erreur: '+e.message));
+}
+
+function saveContrat(empId){
+  const contractType=document.getElementById('rh-ctype').value;
+  const contractHours=+document.getElementById('mh').value||35;
+  const grossSalary=+document.getElementById('rh-salary').value||null;
+  const csVal=document.getElementById('rh-cstart').value;
+  const ceVal=document.getElementById('rh-cend')?.value;
+  const trialVal=document.getElementById('rh-trial').value;
+  const data={contractType,contractHours,postes:[...mPostes]};
+  if(grossSalary)data.grossSalary=grossSalary;
+  if(csVal)data.contractStart=firebase.firestore.Timestamp.fromDate(new Date(csVal));
+  if(ceVal&&contractType==='CDD')data.contractEnd=firebase.firestore.Timestamp.fromDate(new Date(ceVal));
+  if(trialVal)data.trialEndDate=firebase.firestore.Timestamp.fromDate(new Date(trialVal));
+  db.collection('employees').doc(empId).update(data)
+    .then(()=>{closeModal();renderRH();})
+    .catch(e=>alert('Erreur: '+e.message));
+}
+
+function saveDispo(empId){
+  const emp=S.emps.find(e=>e.id===empId);
+  if(!emp)return;
+  // merge current DOM state
+  const dispo={};
+  JOURS.forEach(j=>{
+    dispo[j.k]={};
+    SLOTS.forEach(s=>{
+      const el=document.getElementById(`ds-${j.k}-${s.k}`);
+      dispo[j.k][s.k]=el?el.classList.contains('on'):(emp.dispo?.[j.k]?.[s.k]||false);
+    });
+  });
+  const dispoNotes=document.getElementById('rh-dispo-notes')?.value||'';
+  db.collection('employees').doc(empId).update({dispo,dispoNotes})
+    .then(()=>{closeModal();renderRH();})
+    .catch(e=>alert('Erreur: '+e.message));
+}
+
+// ═══════════════════════════════════
 // ÉQUIPE
 // ═══════════════════════════════════
 function renderEmployes(){
@@ -806,6 +1130,7 @@ function renderEmployes(){
           ${ex.length?`<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:2px">${ex.map(pid=>{const psp=PS_[pid]||{};return`<span style="padding:1px 5px;border-radius:10px;font-size:9px;font-weight:600;background:${psp.bg||'#F8FAFC'};color:${psp.tx||'#374151'};border:1px solid ${psp.bd||'#E2E8F0'}">${pid}</span>`;}).join('')}</div>`:''}
         </div>
         <div style="display:flex;gap:4px">
+          <button onclick="openFicheRH('${emp.id}')" style="background:#F0F9FF;border:none;padding:6px 9px;border-radius:7px;font-size:12px" title="Fiche RH">🗂️</button>
           <button onclick='openEmpModal(${JSON.stringify(emp)})' style="background:#F1F5F9;border:none;padding:6px 9px;border-radius:7px;font-size:12px">✏️</button>
           <button onclick="delEmp('${emp.id}')" style="background:#FFF1F2;border:none;padding:6px 9px;border-radius:7px;font-size:12px;color:#BE123C">🗑️</button>
         </div>

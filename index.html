@@ -121,7 +121,7 @@ button,input,select,textarea{font-family:inherit;cursor:pointer}
       <div style="font-size:9px;opacity:.7;letter-spacing:.8px">PLANIFICATION DU PERSONNEL</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
-      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.05/10/2026 18:45</div>
+      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.05/10/2026 19:15</div>
       <div id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:#FCD34D;transition:background .3s" title="Sync Firebase"></div>
     </div>
   </div>
@@ -584,7 +584,7 @@ function autoGen(){
       const need=(calcNeeds(S.fc[dk]||{}))[p.id];if(!need)return;
       const cands=S.emps.filter(e=>(e.postes||[]).includes(p.id)&&!absOn(e.id,dk)&&inContract(e,dk)&&dayAvail(e,dk)&&!np[dk][e.id]?.length&&worked[e.id]<target[e.id])
         .sort((a,b)=>(target[b.id]-worked[b.id])-(target[a.id]-worked[a.id]));
-      let n=0;for(const emp of cands){if(n>=need)break;const sl=AUTO_SL[si%AUTO_SL.length];np[dk][emp.id]=[{s:sl.s,e:sl.e,poste:p.id}];worked[emp.id]++;n++;si++;}
+      let n=0;const g=(dd,ee)=>np[dd]?(np[dd][ee]||[]):shifts(dd,ee);for(const emp of cands){if(n>=need)break;let sl=null;for(let t=0;t<AUTO_SL.length;t++){const c=AUTO_SL[(si+t)%AUTO_SL.length];if(isAvail(emp,dk,c.s,c.e)&&!legalCheck(emp.id,dk,[{s:c.s,e:c.e}],g).errs.length){sl=c;break;}}if(!sl)continue;np[dk][emp.id]=[{s:sl.s,e:sl.e,poste:p.id}];worked[emp.id]++;n++;si++;}
     });
   }
   ds.forEach(d=>{S.plan[iso(d)]=np[iso(d)];});
@@ -600,10 +600,11 @@ function addShift(eid,dk){
   let ns=19*60,ne=23*60;
   if(ex.length){const last=ex.reduce((a,b)=>b.e>a.e?b:a);ns=snap(Math.min(last.e+60,TL_E-MIN_D));ne=Math.min(ns+MIN_D,TL_E);}
   if(!plGuard(eid,dk,ns,ne))return;
+  if(!legalGuard(eid,dk,[...ex,{s:ns,e:ne}]))return;
   setShifts(dk,eid,[...ex,{s:ns,e:ne,poste:mainP(emp||{})}]);renderPlanning();
 }
 function delShift(eid,dk,idx){setShifts(dk,eid,shifts(dk,eid).filter((_,i)=>i!==idx));renderPlanning();}
-function createFirst(eid,dk){if(!absGuard(eid,dk))return;const emp=S.emps.find(e=>e.id===eid),sl=defaultSlot(emp,dk);if(!plGuard(eid,dk,sl.s,sl.e))return;setShifts(dk,eid,[{s:sl.s,e:sl.e,poste:mainP(emp||{})}]);renderPlanning();}
+function createFirst(eid,dk){if(!absGuard(eid,dk))return;const emp=S.emps.find(e=>e.id===eid),sl=defaultSlot(emp,dk);if(!plGuard(eid,dk,sl.s,sl.e))return;if(!legalGuard(eid,dk,[...shifts(dk,eid),{s:sl.s,e:sl.e}]))return;setShifts(dk,eid,[{s:sl.s,e:sl.e,poste:mainP(emp||{})}]);renderPlanning();}
 
 // ═══════════════════════════════════
 // PICKER POSTE
@@ -682,8 +683,8 @@ function pUp(e){
   if(!DRAG)return;
   const{x,y}=coord(e),d=DRAG;DRAG=null;document.body.style.cursor='';
   if(d.type==='poste'){if(Math.abs(x-d.x0)<8&&Math.abs(y-d.y0)<8){const b=d.el.closest('[data-blk]');if(b)showPostePicker(b.dataset.eid,b.dataset.dk,+b.dataset.idx,d.el);}return;}
-  if(d.type==='click'){if(Math.abs(x-d.x0)<8&&Math.abs(y-d.y0)<8){if(!absGuard(d.eid,d.dk))return;const rect=d.track.getBoundingClientRect(),cm=snap(clamp(px2m(x-rect.left),TL_S,TL_E-MIN_D));const emp=S.emps.find(e=>e.id===d.eid);if(!plGuard(d.eid,d.dk,cm,Math.min(cm+MIN_D,TL_E)))return;setShifts(d.dk,d.eid,[...shifts(d.dk,d.eid),{s:cm,e:Math.min(cm+MIN_D,TL_E),poste:mainP(emp||{})}]);renderPlanning();}return;}
-  if(d.moved){const arr=shifts(d.dk,d.eid);if(arr[d.idx]&&!plGuard(d.eid,d.dk,d.cs,d.ce)){renderPlanning();return;}if(arr[d.idx]){arr[d.idx].s=d.cs;arr[d.idx].e=d.ce;setShifts(d.dk,d.eid,arr);renderPlanning();}}
+  if(d.type==='click'){if(Math.abs(x-d.x0)<8&&Math.abs(y-d.y0)<8){if(!absGuard(d.eid,d.dk))return;const rect=d.track.getBoundingClientRect(),cm=snap(clamp(px2m(x-rect.left),TL_S,TL_E-MIN_D));const emp=S.emps.find(e=>e.id===d.eid);if(!plGuard(d.eid,d.dk,cm,Math.min(cm+MIN_D,TL_E)))return;if(!legalGuard(d.eid,d.dk,[...shifts(d.dk,d.eid),{s:cm,e:Math.min(cm+MIN_D,TL_E)}]))return;setShifts(d.dk,d.eid,[...shifts(d.dk,d.eid),{s:cm,e:Math.min(cm+MIN_D,TL_E),poste:mainP(emp||{})}]);renderPlanning();}return;}
+  if(d.moved){const arr=shifts(d.dk,d.eid);if(arr[d.idx]&&!plGuard(d.eid,d.dk,d.cs,d.ce)){renderPlanning();return;}if(arr[d.idx]&&!legalGuard(d.eid,d.dk,arr.map((x,i)=>i===d.idx?{...x,s:d.cs,e:d.ce}:x))){renderPlanning();return;}if(arr[d.idx]){arr[d.idx].s=d.cs;arr[d.idx].e=d.ce;setShifts(d.dk,d.eid,arr);renderPlanning();}}
 }
 
 // ═══════════════════════════════════
@@ -768,6 +769,7 @@ function buildTimeline(dk){
             <div style="flex:1;min-width:0">
               <div style="font-weight:600;font-size:12px;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${emp.prenom} ${emp.nom}</div>
               <div style="font-size:10px;color:${over?'#DC2626':under?'#D97706':'#94A3B8'}">${wh}h/${emp.heures}h</div>
+              ${shs.length&&legalCheck(emp.id,dk,shs).errs.length?`<div title="${legalCheck(emp.id,dk,shs).errs.join(' · ')}" style="font-size:10px;font-weight:700;color:#DC2626">⚖️ Infraction</div>`:''}
               ${absOn(emp.id,dk)?`<div style="font-size:10px;font-weight:700;color:${absType(absOn(emp.id,dk).type).tx}">${absType(absOn(emp.id,dk).type).ico} Absent</div>`:''}
               ${dm?`<div style="font-size:10px;color:#0EA5E9;font-weight:600">${fDur(dm)}</div>`:''}
             </div>${addBtn}
@@ -1015,7 +1017,7 @@ function getCHRAlerts(){
       if(diff>0&&diff<=14) alerts.push({type:'info',ico:'📋',msg:`${emp.prenom} ${emp.nom} — Période d'essai se termine dans ${diff} jour${diff>1?'s':''}`});
     }
   });
-  return alerts.concat(getAbsAlerts(),getPlanAlerts());
+  return alerts.concat(getAbsAlerts(),getPlanAlerts(),getLegalAlerts());
 }
 
 function openFicheRH(empId){
@@ -1343,6 +1345,7 @@ function renderParams(){
       </div>`).join('')}
       <button id="spb" class="btn-pri" onclick="saveParams()" style="width:100%;padding:10px;font-size:14px;border-radius:9px;margin-top:4px">💾 Enregistrer</button>
     </div>
+    ${legalParamsCard()}
     <div class="card" style="padding:14px;margin-bottom:10px">
       <div style="font-size:15px;font-weight:800;color:#0F172A;margin-bottom:3px">🏷️ Gestion des postes</div>
       <div style="font-size:11px;color:#94A3B8;margin-bottom:12px">Créez vos postes — ils apparaissent dans les menus déroulants des créneaux.</div>
@@ -2058,6 +2061,8 @@ function candInfo(emp,dk,sl){
   else if(!isAvail(emp,dk,sl.s,sl.e))pb.push('hors dispo');
   if(overlapShift(emp.id,dk,sl.s,sl.e))pb.push('déjà en poste');
   if(!(emp.postes||[]).includes(sl.poste))pb.push('pas sur ce poste');
+  const lc=legalCheck(emp.id,dk,[...shifts(dk,emp.id),{s:sl.s,e:sl.e}]);
+  if(lc.errs.length)pb.push('⚖️ '+lc.errs[0].replace(/ \(.*$| — .*$/,''));
   const wh=Math.round(wkH(emp.id)*10)/10;
   if(wh+slotH(sl)>emp.heures)pb.push('dépasse contrat');
   return{ok:!pb.length,pb,wh};
@@ -2175,7 +2180,7 @@ function buildTrameAssign(tr){
         <button class="btn-pri" onclick="autoAssign()">⚡ Compléter auto</button>
         <button class="btn-sec" style="color:#BE123C" onclick="clearAssign()">Retirer</button>
       </div>
-      <div style="font-size:10px;color:#94A3B8;margin-top:6px;line-height:1.5">Liste triée : ✅ d'abord. « Compléter auto » ne remplit que les créneaux vides, avec un salarié <b>affecté à ce poste</b>, <b>disponible</b> sur toute la plage, <b>non absent</b>, <b>sous contrat</b>, <b>pas déjà en poste</b> à cette heure et <b>sans dépasser ses heures de contrat</b> — en priorité ceux qui ont le moins d'heures.</div>
+      <div style="font-size:10px;color:#94A3B8;margin-top:6px;line-height:1.5">Liste triée : ✅ d'abord. « Compléter auto » ne remplit que les créneaux vides, avec un salarié <b>affecté à ce poste</b>, <b>disponible</b> sur toute la plage, <b>non absent</b>, <b>sous contrat</b>, <b>pas déjà en poste</b> à cette heure et <b>sans dépasser ses heures de contrat</b> et <b>dans le respect des règles légales</b> (repos 11 h, durée max jour/semaine, jours de repos…) — en priorité ceux qui ont le moins d'heures.</div>
     </div>${cards}`;
 }
 function assignSlot(dk,k,slotId,eid){
@@ -2184,7 +2189,10 @@ function assignSlot(dk,k,slotId,eid){
   if(prev===eid)return;
   if(eid){
     const emp=S.emps.find(e=>e.id===eid),ci=candInfo(emp,dk,sl);
-    if(!ci.ok&&!confirm(`${emp.prenom} : ${ci.pb.join(', ')}.\nAttribuer quand même ?`)){renderTrames();return;}
+    const lgOk=legalCheck(eid,dk,[...shifts(dk,eid),{s:sl.s,e:sl.e}]);
+    if((lgOk.errs.length||lgOk.warns.length)&&!legalGuard(eid,dk,[...shifts(dk,eid),{s:sl.s,e:sl.e}])){renderTrames();return;}
+    const other=ci.pb.filter(x=>!x.startsWith('⚖️'));
+    if(other.length&&!confirm(`${emp.prenom} : ${other.join(', ')}.\nAttribuer quand même ?`)){renderTrames();return;}
   }
   if(prev){const arr=shifts(dk,prev),i=arr.findIndex(sh=>sh.s===sl.s&&sh.e===sl.e&&(sh.poste||mainP(S.emps.find(e=>e.id===prev)||{}))===sl.poste);if(i>=0){arr.splice(i,1);setShifts(dk,prev,arr);}}
   if(eid)setShifts(dk,eid,[...shifts(dk,eid),{s:sl.s,e:sl.e,poste:sl.poste}]);
@@ -2212,6 +2220,105 @@ function clearAssign(){
     slots.forEach(sl=>{const eid=res[sl.id];if(!eid)return;const arr=shifts(dk,eid),j=arr.findIndex(sh=>sh.s===sl.s&&sh.e===sl.e&&(sh.poste||mainP(S.emps.find(e=>e.id===eid)||{}))===sl.poste);if(j>=0){arr.splice(j,1);setShifts(dk,eid,arr);}});
   });
   renderTrames();
+}
+
+// ═══════════════════════════════════
+// RÈGLES LÉGALES — Code du travail / CCN HCR (v34)
+// ═══════════════════════════════════
+const LG_DEF={lgMaxJour:10,lgAmp:13,lgRepos:11,lgMaxSem:48,lgReposJours:2,lgPause:6,lgCompl:10,lgMode:'bloquer'};
+function LG(k){const v=S.par[k];return v===undefined||v===''||v===null?LG_DEF[k]:v;}
+function weekDays(dk){const m=monday(new Date(dk+'T12:00'));return Array.from({length:7},(_,i)=>iso(addD(m,i)));}
+function dkShift(dk,n){return iso(addD(new Date(dk+'T12:00'),n));}
+
+// Contrôle complet d'une journée hypothétique (arr = liste complète des créneaux du jour dk)
+// get(dk,eid) permet de vérifier sur un planning en cours de construction
+function legalCheck(eid,dk,arr,get){
+  get=get||((d,e)=>shifts(d,e));
+  const emp=S.emps.find(e=>e.id===eid)||{heures:35};
+  const sh=d=>(d===dk?arr:get(d,eid))||[];
+  const errs=[],warns=[];
+  const day=sh(dk).slice().sort((a,b)=>a.s-b.s);
+  if(!day.length)return{errs,warns};
+  const tot=day.reduce((s,x)=>s+x.e-x.s,0);
+  if(tot>LG('lgMaxJour')*60)errs.push(`${fDur(tot)} de travail sur la journée (max ${LG('lgMaxJour')} h)`);
+  const amp=day[day.length-1].e-day[0].s;
+  if(amp>LG('lgAmp')*60)errs.push(`amplitude ${fDur(amp)} (max ${LG('lgAmp')} h)`);
+  const rest=LG('lgRepos')*60;
+  const prev=sh(dkShift(dk,-1));
+  if(prev.length){const pe=Math.max(...prev.map(x=>x.e)),r=1440-pe+day[0].s;if(r<rest)errs.push(`repos de ${fDur(r)} seulement depuis la veille (fin ${pe>=1440?'24h':fT(pe)}) — min ${LG('lgRepos')} h`);}
+  const next=sh(dkShift(dk,1));
+  if(next.length){const ns=Math.min(...next.map(x=>x.s)),le=day[day.length-1].e,r=1440-le+ns;if(r<rest)errs.push(`repos de ${fDur(r)} seulement avant le lendemain (début ${fT(ns)}) — min ${LG('lgRepos')} h`);}
+  const wk=weekDays(dk),wMin=wk.reduce((s,d)=>s+sh(d).reduce((ss,x)=>ss+x.e-x.s,0),0);
+  if(wMin>LG('lgMaxSem')*60)errs.push(`${fDur(wMin)} sur la semaine (max ${LG('lgMaxSem')} h)`);
+  const worked=wk.filter(d=>sh(d).length).length;
+  if(worked>7-LG('lgReposJours'))errs.push(`${worked} jours travaillés dans la semaine (${LG('lgReposJours')} jours de repos obligatoires)`);
+  if(day.some(x=>x.e-x.s>LG('lgPause')*60))warns.push(`service de plus de ${LG('lgPause')} h : prévoir une pause de 20 min`);
+  if(emp.heures<35&&wMin>emp.heures*60*(1+LG('lgCompl')/100))warns.push(`temps partiel : heures complémentaires au-delà de ${LG('lgCompl')} % du contrat (${fDur(wMin)} pour ${emp.heures} h)`);
+  return{errs,warns};
+}
+// Avant d'enregistrer une modification manuelle
+function legalGuard(eid,dk,arr){
+  const emp=S.emps.find(e=>e.id===eid);if(!emp)return true;
+  const{errs,warns}=legalCheck(eid,dk,arr);
+  if(!errs.length&&!warns.length)return true;
+  const head=`⚖️ ${emp.prenom} ${emp.nom} — ${fD(dk)}\n`;
+  if(errs.length&&LG('lgMode')==='bloquer'){
+    alert(head+'Impossible, règle légale non respectée :\n• '+errs.join('\n• ')+(warns.length?'\n\nÀ noter :\n• '+warns.join('\n• '):'')+'\n\n(Seuils dans Paramètres › Règles légales)');
+    return false;
+  }
+  return confirm(head+[...errs.map(e=>'⛔ '+e),...warns.map(w=>'⚠️ '+w)].join('\n')+'\n\nEnregistrer quand même ?');
+}
+// Alertes pour les créneaux à venir (une ligne par salarié et par jour)
+function getLegalAlerts(){
+  const out=[],today=todayIso();
+  Object.keys(S.plan).filter(dk=>dk>=today).sort().forEach(dk=>{
+    S.emps.forEach(emp=>{
+      const arr=shifts(dk,emp.id);if(!arr.length)return;
+      const{errs,warns}=legalCheck(emp.id,dk,arr);
+      if(errs.length)out.push({type:'warn',ico:'⚖️',msg:`${emp.prenom} ${emp.nom} — ${fD(dk)} : ${errs.join(' · ')}`});
+      else if(warns.length)out.push({type:'info',ico:'⏸️',msg:`${emp.prenom} ${emp.nom} — ${fD(dk)} : ${warns.join(' · ')}`});
+    });
+  });
+  return out;
+}
+function legalRulesHtml(){
+  return`• <b>Repos quotidien</b> : ${LG('lgRepos')} h consécutives minimum entre deux journées<br>
+      • <b>Durée maximale par jour</b> : ${LG('lgMaxJour')} h de travail<br>
+      • <b>Amplitude</b> : ${LG('lgAmp')} h maximum entre le début et la fin de la journée (coupures comprises)<br>
+      • <b>Durée maximale par semaine</b> : ${LG('lgMaxSem')} h (lundi → dimanche)<br>
+      • <b>Repos hebdomadaire</b> : ${LG('lgReposJours')} jours sans travail par semaine<br>
+      • <b>Pause</b> : avertissement si un service dépasse ${LG('lgPause')} h d'affilée (20 min obligatoires)<br>
+      • <b>Temps partiel</b> : avertissement si les heures complémentaires dépassent ${LG('lgCompl')} % du contrat`;
+}
+function legalParamsCard(){
+  const f=(k,l,u)=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;border:1px solid #F1F5F9;background:#FAFAFA;margin-bottom:5px">
+    <div style="flex:1"><div style="font-size:12px;font-weight:500;color:#374151">${l}</div><div style="font-size:10px;color:#94A3B8">${u}</div></div>
+    <input type="number" step="0.5" value="${LG(k)}" id="lg-${k}" style="width:66px;padding:5px 7px;border:1px solid #E2E8F0;border-radius:7px;font-size:14px;font-weight:700;text-align:center;outline:none"></div>`;
+  return`<div class="card" style="padding:16px;margin-bottom:10px">
+    <div style="font-size:15px;font-weight:800;color:#0F172A;margin-bottom:3px">⚖️ Règles légales (Code du travail / CCN HCR)</div>
+    <div style="font-size:11px;color:#94A3B8;margin-bottom:10px">Appliquées au planning manuel, au bouton ⚡ Générer et à ⚡ Compléter auto des trames.</div>
+    ${f('lgRepos','Repos minimum entre deux journées','heures (légal : 11 h)')}
+    ${f('lgMaxJour','Travail maximum par jour','heures (Code du travail : 10 h · HCR : jusqu\'à 11 h–11 h 30 selon le poste)')}
+    ${f('lgAmp','Amplitude maximum de la journée','heures (13 h)')}
+    ${f('lgMaxSem','Travail maximum par semaine','heures (absolu : 48 h)')}
+    ${f('lgReposJours','Jours de repos par semaine','jours (HCR : 2)')}
+    ${f('lgPause','Avertir si un service dépasse','heures sans pause (6 h)')}
+    ${f('lgCompl','Heures complémentaires temps partiel','% du contrat (10 %)')}
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;border:1px solid #F1F5F9;background:#FAFAFA;margin-bottom:8px">
+      <div style="flex:1;font-size:12px;font-weight:500;color:#374151">En cas d'infraction</div>
+      <select id="lg-lgMode" class="tag-select" style="width:auto;padding:5px 8px;font-size:12px">
+        <option value="bloquer" ${LG('lgMode')==='bloquer'?'selected':''}>⛔ Bloquer (recommandé)</option>
+        <option value="avertir" ${LG('lgMode')==='avertir'?'selected':''}>⚠️ Avertir seulement</option>
+      </select>
+    </div>
+    <div style="font-size:11px;color:#374151;line-height:1.7;background:#F8FAFC;border-radius:8px;padding:8px 10px;margin-bottom:8px"><b>Règles actives :</b><br>${legalRulesHtml()}</div>
+    <button id="lg-save" class="btn-pri" onclick="saveLegal()" style="width:100%;padding:10px;font-size:14px;border-radius:9px">💾 Enregistrer les règles</button>
+  </div>`;
+}
+function saveLegal(){
+  Object.keys(LG_DEF).forEach(k=>{const el=document.getElementById('lg-'+k);if(!el)return;if(k==='lgMode'){S.par[k]=el.value;return;}const n=parseFloat(String(el.value).replace(',','.'));S.par[k]=isNaN(n)||n<0?LG_DEF[k]:n;});
+  autoSave();renderParams();
+  const b=document.getElementById('lg-save');if(b){b.textContent='✓ Enregistré';b.style.background='#16A34A';}
 }
 
 // ═══════════════════════════════════
@@ -2325,7 +2432,8 @@ function rulesCard(){
       • <b>Accident du travail</b> : déclaration à la CPAM sous 48 h<br>
       • <b>Visite de reprise</b> : après un arrêt maladie ≥ 60 jours ou un accident du travail ≥ 30 jours (à faire dans les 8 jours suivant le retour) — alerte de 14 jours avant à 8 jours après le retour<br>
       • <b>Congés payés</b> : solde négatif (2,5 jours ouvrables acquis par mois, 30 j max, période du 1er juin au 31 mai)<br>
-      • <b>Absence injustifiée</b> : à régulariser une fois terminée
+      • <b>Absence injustifiée</b> : à régulariser une fois terminée<br>
+      <div style="margin-top:6px;font-weight:700">⚖️ Règles légales (seuils modifiables dans Paramètres) :</div>${legalRulesHtml()}
     </div>
     <div style="font-size:10px;color:#94A3B8;margin-top:6px">CP décomptés en jours ouvrables (lundi → samedi, hors jours fériés). Le compteur est une estimation : à rapprocher de la fiche de paie.</div>
   </div>`;
@@ -2336,7 +2444,7 @@ function renderAbsences(){
   const ds=days(),today=todayIso(),j90=iso(addD(new Date(),-90));
   const list=ABS.filter(a=>!_absFilter||a.empId===_absFilter).sort((a,b)=>a.start<b.start?-1:1);
   const enCours=list.filter(a=>a.end>=today),passees=list.filter(a=>a.end<today&&a.end>=j90).reverse();
-  const alerts=getAbsAlerts().concat(getPlanAlerts());
+  const alerts=getAbsAlerts().concat(getPlanAlerts(),getLegalAlerts());
   const empOpts=S.emps.map(e=>`<option value="${e.id}" ${_absFilter===e.id?'selected':''}>${e.prenom} ${e.nom}</option>`).join('');
   const absRow=a=>{
     const emp=S.emps.find(e=>e.id===a.empId),t=absType(a.type);

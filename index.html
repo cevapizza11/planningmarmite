@@ -121,7 +121,7 @@ button,input,select,textarea{font-family:inherit;cursor:pointer}
       <div style="font-size:9px;opacity:.7;letter-spacing:.8px">PLANIFICATION DU PERSONNEL</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
-      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.05/10/2026 16:15</div>
+      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.05/10/2026 16:45</div>
       <div id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:#FCD34D;transition:background .3s" title="Sync Firebase"></div>
     </div>
   </div>
@@ -521,6 +521,9 @@ function rebuildEmps(){
           trialEndDate:data.trialEndDate||null,
           dispo:data.dispo||{lun:{mat:true,am:true,soir:true},mar:{mat:true,am:true,soir:true},mer:{mat:true,am:true,soir:true},jeu:{mat:true,am:true,soir:true},ven:{mat:true,am:true,soir:true},sam:{mat:true,am:true,soir:true},dim:{mat:false,am:false,soir:false}},
           dispoNotes:data.dispoNotes||'',
+          dispoH:data.dispoH||null,
+          dispoSet:!!data.dispoH,
+          _dispoRaw:data.dispo||null,
           nir:data.nir||'',
           contractTemplate:data.contractTemplate||'equipier',
           cpReport:+(data.cpReport||0)
@@ -574,7 +577,7 @@ function autoGen(){
     const dk=iso(day);let si=0;
     getPostes().forEach(p=>{
       const need=(calcNeeds(S.fc[dk]||{}))[p.id];if(!need)return;
-      const cands=S.emps.filter(e=>(e.postes||[]).includes(p.id)&&!absOn(e.id,dk)&&!np[dk][e.id]?.length&&worked[e.id]<target[e.id])
+      const cands=S.emps.filter(e=>(e.postes||[]).includes(p.id)&&!absOn(e.id,dk)&&inContract(e,dk)&&dayAvail(e,dk)&&!np[dk][e.id]?.length&&worked[e.id]<target[e.id])
         .sort((a,b)=>(target[b.id]-worked[b.id])-(target[a.id]-worked[a.id]));
       let n=0;for(const emp of cands){if(n>=need)break;const sl=AUTO_SL[si%AUTO_SL.length];np[dk][emp.id]=[{s:sl.s,e:sl.e,poste:p.id}];worked[emp.id]++;n++;si++;}
     });
@@ -591,10 +594,11 @@ function addShift(eid,dk){
   const emp=S.emps.find(e=>e.id===eid),ex=shifts(dk,eid);
   let ns=19*60,ne=23*60;
   if(ex.length){const last=ex.reduce((a,b)=>b.e>a.e?b:a);ns=snap(Math.min(last.e+60,TL_E-MIN_D));ne=Math.min(ns+MIN_D,TL_E);}
+  if(!plGuard(eid,dk,ns,ne))return;
   setShifts(dk,eid,[...ex,{s:ns,e:ne,poste:mainP(emp||{})}]);renderPlanning();
 }
 function delShift(eid,dk,idx){setShifts(dk,eid,shifts(dk,eid).filter((_,i)=>i!==idx));renderPlanning();}
-function createFirst(eid,dk){if(!absGuard(eid,dk))return;const emp=S.emps.find(e=>e.id===eid);setShifts(dk,eid,[{s:11*60+30,e:17*60+30,poste:mainP(emp||{})}]);renderPlanning();}
+function createFirst(eid,dk){if(!absGuard(eid,dk))return;const emp=S.emps.find(e=>e.id===eid),sl=defaultSlot(emp,dk);if(!plGuard(eid,dk,sl.s,sl.e))return;setShifts(dk,eid,[{s:sl.s,e:sl.e,poste:mainP(emp||{})}]);renderPlanning();}
 
 // ═══════════════════════════════════
 // PICKER POSTE
@@ -673,8 +677,8 @@ function pUp(e){
   if(!DRAG)return;
   const{x,y}=coord(e),d=DRAG;DRAG=null;document.body.style.cursor='';
   if(d.type==='poste'){if(Math.abs(x-d.x0)<8&&Math.abs(y-d.y0)<8){const b=d.el.closest('[data-blk]');if(b)showPostePicker(b.dataset.eid,b.dataset.dk,+b.dataset.idx,d.el);}return;}
-  if(d.type==='click'){if(Math.abs(x-d.x0)<8&&Math.abs(y-d.y0)<8){if(!absGuard(d.eid,d.dk))return;const rect=d.track.getBoundingClientRect(),cm=snap(clamp(px2m(x-rect.left),TL_S,TL_E-MIN_D));const emp=S.emps.find(e=>e.id===d.eid);setShifts(d.dk,d.eid,[...shifts(d.dk,d.eid),{s:cm,e:Math.min(cm+MIN_D,TL_E),poste:mainP(emp||{})}]);renderPlanning();}return;}
-  if(d.moved){const arr=shifts(d.dk,d.eid);if(arr[d.idx]){arr[d.idx].s=d.cs;arr[d.idx].e=d.ce;setShifts(d.dk,d.eid,arr);renderPlanning();}}
+  if(d.type==='click'){if(Math.abs(x-d.x0)<8&&Math.abs(y-d.y0)<8){if(!absGuard(d.eid,d.dk))return;const rect=d.track.getBoundingClientRect(),cm=snap(clamp(px2m(x-rect.left),TL_S,TL_E-MIN_D));const emp=S.emps.find(e=>e.id===d.eid);if(!plGuard(d.eid,d.dk,cm,Math.min(cm+MIN_D,TL_E)))return;setShifts(d.dk,d.eid,[...shifts(d.dk,d.eid),{s:cm,e:Math.min(cm+MIN_D,TL_E),poste:mainP(emp||{})}]);renderPlanning();}return;}
+  if(d.moved){const arr=shifts(d.dk,d.eid);if(arr[d.idx]&&!plGuard(d.eid,d.dk,d.cs,d.ce)){renderPlanning();return;}if(arr[d.idx]){arr[d.idx].s=d.cs;arr[d.idx].e=d.ce;setShifts(d.dk,d.eid,arr);renderPlanning();}}
 }
 
 // ═══════════════════════════════════
@@ -766,7 +770,7 @@ function buildTimeline(dk){
             style="position:relative;width:${TL_W}px;height:${rh}px;flex-shrink:0;background-color:${z};
               background-image:repeating-linear-gradient(90deg,transparent 0,transparent 119px,rgba(0,0,0,.04) 119px,rgba(0,0,0,.04) 120px);
               cursor:crosshair;touch-action:none">
-            ${nowLine}${absOverlay(emp.id,dk)}${buildBlocks(emp,shs,dk)}
+            ${nowLine}${dispoOverlay(emp,dk)}${absOverlay(emp.id,dk)}${buildBlocks(emp,shs,dk)}
           </div>
         </div>`;
       });
@@ -801,9 +805,10 @@ function buildBlocks(emp,shs,dk){
     const w=m2px(sh.e)-m2px(sh.s),narrow=w<110,vNarrow=w<50;
     const poste=sh.poste||mainP(emp),ps=PS_[poste]||(PS_[getPostes()[0].id]||{});
     const pc=getPostes().find(p=>p.id===poste)||getPostes()[0];
+    const hors=!inContract(emp,dk)||!isAvail(emp,dk,sh.s,sh.e);
     return`<div id="blk-${emp.id}-${idx}" data-blk="1" data-eid="${emp.id}" data-dk="${dk}" data-idx="${idx}"
       style="position:absolute;left:${m2px(sh.s)}px;width:${w}px;top:${bTop(idx)}px;height:${BH}px;
-             background:${ps.bg||'#EFF6FF'};border:1.5px solid ${ps.bd||'#BFDBFE'};border-radius:8px;
+             background:${ps.bg||'#EFF6FF'};border:${hors?'2px dashed #DC2626':'1.5px solid '+(ps.bd||'#BFDBFE')};border-radius:8px;
              display:flex;align-items:stretch;box-shadow:0 1px 5px rgba(0,0,0,.12);z-index:2;overflow:visible;min-width:20px">
       <div data-role="left" style="position:absolute;left:0;top:0;bottom:0;width:12px;cursor:ew-resize;background:${ps.bd||'#BFDBFE'};border-radius:7px 0 0 7px;display:flex;align-items:center;justify-content:center;z-index:3"><span style="font-size:8px;color:${ps.tx||'#1E40AF'};pointer-events:none;user-select:none">⋮</span></div>
       <div data-role="move" style="flex:1;cursor:grab;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 14px;overflow:hidden;user-select:none">
@@ -967,7 +972,7 @@ function renderRH(){
     const ct=emp._contractType||'CDI';
     const ctColor=CONTRACT_COLORS[ct]||'#374151';
     const ctBg=CONTRACT_BG[ct]||'#F1F5F9';
-    const dispoCount=JOURS.filter(j=>SLOTS.some(s=>emp.dispo?.[j.k]?.[s.k])).length;
+    const dispoCount=emp.dispoSet?DISPO_JOURS.filter(j=>mergeRanges(emp.dispoH[j.k]).length).length:null;
     html+=`<div class="card" style="padding:12px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="openFicheRH('${emp.id}')">
       <div style="width:42px;height:42px;border-radius:50%;background:${ctBg};border:2px solid ${ctColor};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:${ctColor};flex-shrink:0">${(emp.prenom?.[0]||'?').toUpperCase()}${(emp.nom?.[0]||'').toUpperCase()}</div>
       <div style="flex:1;min-width:0">
@@ -975,7 +980,7 @@ function renderRH(){
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:3px">
           <span style="padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;background:${ctBg};color:${ctColor}">${ct}</span>
           <span style="font-size:11px;color:#64748B">${emp.heures}h/sem</span>
-          <span style="font-size:11px;color:#64748B">📅 ${dispoCount}j/7</span>
+          ${dispoCount===null?`<span style="padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;background:#FFFBEB;color:#92400E;border:1px solid #FCD34D">🗓️ Dispos à compléter</span>`:`<span style="font-size:11px;color:#64748B">📅 dispo ${dispoCount}j/7</span>`}
           ${emp.phone?`<span style="font-size:11px;color:#64748B">📞 ${emp.phone}</span>`:''}
         </div>
       </div>
@@ -1004,7 +1009,7 @@ function getCHRAlerts(){
       if(diff>0&&diff<=14) alerts.push({type:'info',ico:'📋',msg:`${emp.prenom} ${emp.nom} — Période d'essai se termine dans ${diff} jour${diff>1?'s':''}`});
     }
   });
-  return alerts.concat(typeof getAbsAlerts==='function'?getAbsAlerts():[]);
+  return alerts.concat(getAbsAlerts(),getPlanAlerts());
 }
 
 function openFicheRH(empId){
@@ -1012,6 +1017,7 @@ function openFicheRH(empId){
   if(!emp)return;
   _rhEmpTab='identite';
   mPostes=[...(emp.postes||[])];
+  _tmpDispoH=null;
   buildFicheRH(emp);
 }
 
@@ -1146,103 +1152,6 @@ function buildTabContrat(emp){
   </div>`;
 }
 
-function buildTabDispo(emp){
-  const d=emp.dispo||{};
-  let grid=`<div class="dispo-grid">
-    <div></div>
-    ${SLOTS.map(s=>`<div style="font-size:10px;font-weight:700;color:#64748B;text-align:center">${s.l}</div>`).join('')}`;
-  JOURS.forEach(j=>{
-    const jd=d[j.k]||{mat:false,am:false,soir:false};
-    const isWE=j.k==='sam'||j.k==='dim';
-    grid+=`<div class="dispo-day" style="${isWE?'color:#DC2626':''}">${j.l}</div>`;
-    SLOTS.forEach(s=>{
-      const on=jd[s.k]===true;
-      grid+=`<div class="dispo-slot ${on?'on':'off'}" id="ds-${j.k}-${s.k}" onclick="toggleDispo('${j.k}','${s.k}')">${on?'✓':'✗'}</div>`;
-    });
-  });
-  grid+=`</div>`;
-  return`<div class="rh-section">
-    <div class="rh-card">
-      <div class="rh-card-title">Disponibilités habituelles</div>
-      <div style="font-size:11px;color:#64748B;margin-bottom:10px">Cochez les créneaux où l'employé est disponible</div>
-      ${grid}
-    </div>
-    <div class="rh-card">
-      <div class="rh-card-title">Notes sur les disponibilités</div>
-      <textarea class="fld-inp" id="rh-dispo-notes" rows="3" placeholder="Ex : pas disponible les mercredis soirs en hiver, préfère les midis...">${emp.dispoNotes||''}</textarea>
-    </div>
-    <div class="modal-foot" style="position:static;border-top:none;padding:0">
-      <button onclick="closeModal()" class="btn-sec">Annuler</button>
-      <button onclick="saveDispo('${emp.id}')" class="btn-pri">💾 Enregistrer</button>
-    </div>
-  </div>`;
-}
-
-let _tmpDispo={};
-function toggleDispo(jour,slot){
-  if(!_tmpDispo[jour])_tmpDispo[jour]={mat:false,am:false,soir:false};
-  const el=document.getElementById(`ds-${jour}-${slot}`);
-  const emp=S.emps.find(e=>document.getElementById('modal-root').innerHTML.includes(e.id));
-  // read current state from DOM
-  const isOn=el.classList.contains('on');
-  _tmpDispo[jour][slot]=!isOn;
-  el.classList.toggle('on',!isOn);
-  el.classList.toggle('off',isOn);
-  el.textContent=!isOn?'✓':'✗';
-}
-
-function saveIdentite(empId){
-  const prenom=(document.getElementById('rh-prenom').value||'').trim();
-  const nom=(document.getElementById('rh-nom').value||'').trim();
-  if(!prenom||!nom){alert('Prénom et Nom requis.');return;}
-  const phone=document.getElementById('rh-phone').value.trim();
-  const email=document.getElementById('rh-email').value.trim();
-  const address=document.getElementById('rh-address').value.trim();
-  const nir=cleanNIR(document.getElementById('rh-nir').value);
-  if(nir&&!nirValid(nir)){if(!confirm('Le n° de Sécurité Sociale semble incorrect (clé invalide). Enregistrer quand même ?'))return;}
-  const name=`${prenom} ${nom}`;
-  db.collection('employees').doc(empId).update({name})
-    .then(()=>PRIVREF.doc(empId).set({phone,email,address,nir},{merge:true}))
-    .then(()=>{closeModal();renderRH();})
-    .catch(e=>alert('Erreur: '+e.message));
-}
-
-function saveContrat(empId){
-  const contractType=document.getElementById('rh-ctype').value;
-  const contractHours=+document.getElementById('mh').value||35;
-  const grossSalary=+document.getElementById('rh-salary').value||null;
-  const csVal=document.getElementById('rh-cstart').value;
-  const ceVal=document.getElementById('rh-cend')?.value;
-  const trialVal=document.getElementById('rh-trial').value;
-  const contractTemplate=document.getElementById('rh-ctpl')?.value||'equipier';
-  const data={contractType,contractHours,contractTemplate,postes:[...mPostes]};
-
-  if(csVal)data.contractStart=firebase.firestore.Timestamp.fromDate(new Date(csVal));
-  if(ceVal&&contractType==='CDD')data.contractEnd=firebase.firestore.Timestamp.fromDate(new Date(ceVal));
-  if(trialVal)data.trialEndDate=firebase.firestore.Timestamp.fromDate(new Date(trialVal));
-  db.collection('employees').doc(empId).update(data)
-    .then(()=>PRIVREF.doc(empId).set({grossSalary:grossSalary||null},{merge:true}))
-    .then(()=>{closeModal();renderRH();})
-    .catch(e=>alert('Erreur: '+e.message));
-}
-
-function saveDispo(empId){
-  const emp=S.emps.find(e=>e.id===empId);
-  if(!emp)return;
-  // merge current DOM state
-  const dispo={};
-  JOURS.forEach(j=>{
-    dispo[j.k]={};
-    SLOTS.forEach(s=>{
-      const el=document.getElementById(`ds-${j.k}-${s.k}`);
-      dispo[j.k][s.k]=el?el.classList.contains('on'):(emp.dispo?.[j.k]?.[s.k]||false);
-    });
-  });
-  const dispoNotes=document.getElementById('rh-dispo-notes')?.value||'';
-  db.collection('employees').doc(empId).update({dispo,dispoNotes})
-    .then(()=>{closeModal();renderRH();})
-    .catch(e=>alert('Erreur: '+e.message));
-}
 
 // ═══════════════════════════════════
 // ÉQUIPE
@@ -1863,6 +1772,151 @@ async function generateContractWord(empId){
 }
 
 // ═══════════════════════════════════
+// DISPONIBILITÉS PAR PLAGES HORAIRES (v30)
+// ═══════════════════════════════════
+const JK=['dim','lun','mar','mer','jeu','ven','sam'];
+const DISPO_JOURS=[{k:'lun',l:'Lundi'},{k:'mar',l:'Mardi'},{k:'mer',l:'Mercredi'},{k:'jeu',l:'Jeudi'},{k:'ven',l:'Vendredi'},{k:'sam',l:'Samedi'},{k:'dim',l:'Dimanche'}];
+const LEGACY_SLOT_H={mat:[6*60,12*60],am:[12*60,18*60],soir:[18*60,24*60]};
+let _tmpDispoH=null;
+
+function mergeRanges(arr){
+  const r=(arr||[]).filter(x=>x&&x.e>x.s).map(x=>({s:x.s,e:x.e})).sort((a,b)=>a.s-b.s),out=[];
+  r.forEach(x=>{const l=out[out.length-1];if(l&&x.s<=l.e)l.e=Math.max(l.e,x.e);else out.push(x);});
+  return out;
+}
+// Convertit l'ancienne grille Matin / A-midi / Soir en plages horaires
+function legacyToRanges(old){
+  const o={};
+  DISPO_JOURS.forEach(j=>{o[j.k]=mergeRanges(Object.keys(LEGACY_SLOT_H).filter(k=>old?.[j.k]?.[k]).map(k=>({s:LEGACY_SLOT_H[k][0],e:LEGACY_SLOT_H[k][1]})));});
+  return o;
+}
+function dayRanges(emp,dk){const k=JK[new Date(dk+'T12:00').getDay()];return mergeRanges((emp.dispoH||{})[k]);}
+// Dispos jamais renseignées → considéré disponible partout
+function isAvail(emp,dk,s,e){
+  if(!emp||!emp.dispoSet)return true;
+  return dayRanges(emp,dk).some(r=>r.s<=s&&r.e>=e);
+}
+function dayAvail(emp,dk){return !emp.dispoSet||dayRanges(emp,dk).length>0;}
+function fRanges(rs){return rs.length?rs.map(r=>fT(r.s)+'–'+(r.e>=1440?'24h':fT(r.e))).join(', '):'indisponible';}
+function tsIso(ts){if(!ts)return null;const d=ts.toDate?ts.toDate():new Date(ts);return iso(d);}
+function inContract(emp,dk){
+  const s=tsIso(emp.contractStart),e=emp._contractType==='CDD'?tsIso(emp.contractEnd):null;
+  return !(s&&dk<s)&&!(e&&dk>e);
+}
+// Contrôle avant de créer / déplacer un créneau
+function plGuard(eid,dk,s,e){
+  const emp=S.emps.find(x=>x.id===eid);if(!emp)return true;
+  const pb=[];
+  if(!inContract(emp,dk))pb.push('en dehors de sa période de contrat');
+  if(!isAvail(emp,dk,s,e))pb.push(`hors de ses disponibilités (${fRanges(dayRanges(emp,dk))})`);
+  if(!pb.length)return true;
+  return confirm(`${emp.prenom} : créneau ${fT(s)}–${fT(e)} ${pb.join(' et ')}.\nPlanifier quand même ?`);
+}
+// Premier créneau proposé : dans la première plage dispo du jour
+function defaultSlot(emp,dk){
+  const rs=emp&&emp.dispoSet?dayRanges(emp,dk):[];
+  if(rs.length){const r=rs[0],s=Math.max(r.s,TL_S),e=Math.min(r.e,s+6*60,TL_E);if(e-s>=MIN_D)return{s,e};}
+  return{s:11*60+30,e:17*60+30};
+}
+// Zones grisées dans le Gantt
+function dispoOverlay(emp,dk){
+  if(!inContract(emp,dk))return`<div style="position:absolute;inset:0;z-index:1;pointer-events:none;background:repeating-linear-gradient(135deg,#F1F5F9 0,#F1F5F9 8px,#E2E8F0 8px,#E2E8F0 16px);display:flex;align-items:center;padding-left:${m2px(8*60)}px"><span style="padding:3px 10px;border-radius:12px;background:#fff;border:1px solid #CBD5E1;color:#475569;font-size:11px;font-weight:700">📄 Hors période de contrat</span></div>`;
+  if(!emp.dispoSet)return'';
+  const rs=dayRanges(emp,dk),gaps=[];let cur=TL_S;
+  rs.forEach(r=>{if(r.s>cur)gaps.push([cur,Math.min(r.s,TL_E)]);cur=Math.max(cur,r.e);});
+  if(cur<TL_E)gaps.push([cur,TL_E]);
+  return gaps.filter(g=>g[1]>g[0]).map(g=>`<div title="Non disponible" style="position:absolute;top:0;bottom:0;left:${m2px(g[0])}px;width:${m2px(g[1])-m2px(g[0])}px;z-index:1;pointer-events:none;background:repeating-linear-gradient(135deg,rgba(148,163,184,.10) 0,rgba(148,163,184,.10) 6px,rgba(148,163,184,.28) 6px,rgba(148,163,184,.28) 12px)"></div>`).join('');
+}
+// Créneaux à venir hors dispo / hors contrat
+function getPlanAlerts(){
+  const out=[],today=todayIso();
+  Object.keys(S.plan).filter(dk=>dk>=today).sort().forEach(dk=>{
+    S.emps.forEach(emp=>{
+      const shs=shifts(dk,emp.id);if(!shs.length)return;
+      if(!inContract(emp,dk))out.push({type:'warn',ico:'📄',msg:`${emp.prenom} ${emp.nom} — planifié le ${fD(dk)} en dehors de sa période de contrat`});
+      else if(shs.some(sh=>!isAvail(emp,dk,sh.s,sh.e)))out.push({type:'warn',ico:'🕐',msg:`${emp.prenom} ${emp.nom} — créneau du ${fD(dk)} hors disponibilités (dispo : ${fRanges(dayRanges(emp,dk))})`});
+    });
+  });
+  return out;
+}
+
+// ── Onglet Dispos de la fiche RH ──
+function buildTabDispo(emp){
+  if(!_tmpDispoH||_tmpDispoH._emp!==emp.id){
+    const base=emp.dispoSet?emp.dispoH:(emp._dispoRaw?legacyToRanges(emp._dispoRaw):null);
+    _tmpDispoH={_emp:emp.id,_fromLegacy:!emp.dispoSet&&!!emp._dispoRaw};
+    DISPO_JOURS.forEach(j=>{_tmpDispoH[j.k]=base?mergeRanges(base[j.k]):[{s:10*60,e:15*60},{s:18*60,e:23*60}];});
+    _tmpDispoH._new=!base;
+  }
+  return`<div class="rh-section">
+    ${!emp.dispoSet?`<div class="alert-chr warn"><span>🗓️</span><span>${_tmpDispoH._fromLegacy?'Plages converties depuis l’ancienne grille Matin / Après-midi / Soir : vérifiez puis enregistrez.':'Disponibilités pas encore renseignées : pré-rempli 10h–15h et 18h–23h, à ajuster puis enregistrer.'} Tant que ce n’est pas enregistré, l’employé est considéré disponible partout.</span></div>`:''}
+    <div class="rh-card">
+      <div class="rh-card-title">Disponibilités habituelles</div>
+      <div style="font-size:11px;color:#64748B;margin-bottom:10px">Indiquez les plages horaires où l'employé peut travailler. Jour sans plage = indisponible.</div>
+      <div id="dispo-days">${buildDispoDays()}</div>
+      <button onclick="copyDispoLundi()" class="btn-sec" style="width:100%;margin-top:8px">📋 Copier le lundi sur tous les jours</button>
+    </div>
+    <div class="rh-card">
+      <div class="rh-card-title">Notes sur les disponibilités</div>
+      <textarea class="fld-inp" id="rh-dispo-notes" rows="3" placeholder="Ex : pas disponible les mercredis soirs en hiver, préfère les midis...">${emp.dispoNotes||''}</textarea>
+    </div>
+    <div class="modal-foot" style="position:static;border-top:none;padding:0">
+      <button onclick="_tmpDispoH=null;closeModal()" class="btn-sec">Annuler</button>
+      <button onclick="saveDispo('${emp.id}')" class="btn-pri">💾 Enregistrer</button>
+    </div>
+  </div>`;
+}
+function m2hhmm(m){if(m>=1440)return'00:00';return p2(Math.floor(m/60))+':'+p2(m%60);}
+function hhmm2m(v,isEnd){if(!v)return null;const[h,mm]=v.split(':').map(Number);let m=h*60+mm;if(isEnd&&m===0)m=1440;return m;}
+function buildDispoDays(){
+  return DISPO_JOURS.map(j=>{
+    const rs=_tmpDispoH[j.k]||[],we=j.k==='sam'||j.k==='dim';
+    return`<div style="padding:8px 0;border-bottom:1px solid #F1F5F9">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <div style="width:72px;font-size:12px;font-weight:700;color:${we?'#DC2626':'#374151'}">${j.l}</div>
+        ${rs.length?'':`<span style="font-size:11px;font-weight:700;color:#BE123C;padding:3px 8px;border-radius:6px;background:#FFF1F2;border:1px solid #FECDD3">Indisponible</span>`}
+        <div style="margin-left:auto;display:flex;gap:4px">
+          <button onclick="dispoAdd('${j.k}')" style="background:#F0FDF4;border:1px solid #86EFAC;color:#15803D;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:700">+ plage</button>
+          <button onclick="dispoFull('${j.k}')" style="background:#F0F9FF;border:1px solid #BAE6FD;color:#0369A1;padding:4px 8px;border-radius:6px;font-size:11px">Journée</button>
+          <button onclick="dispoNone('${j.k}')" style="background:#FFF1F2;border:1px solid #FECDD3;color:#BE123C;padding:4px 8px;border-radius:6px;font-size:11px">Indispo</button>
+        </div>
+      </div>
+      ${rs.map((r,i)=>`<div style="display:flex;align-items:center;gap:6px;margin:6px 0 0 72px">
+        <input type="time" step="900" value="${m2hhmm(r.s)}" onchange="dispoSet('${j.k}',${i},'s',this.value)" style="padding:5px 6px;border:1px solid #86EFAC;border-radius:7px;font-size:13px;background:#F0FDF4">
+        <span style="font-size:12px;color:#64748B">→</span>
+        <input type="time" step="900" value="${m2hhmm(r.e)}" onchange="dispoSet('${j.k}',${i},'e',this.value)" style="padding:5px 6px;border:1px solid #86EFAC;border-radius:7px;font-size:13px;background:#F0FDF4">
+        <button onclick="dispoDel('${j.k}',${i})" style="background:none;border:none;color:#BE123C;font-size:15px;padding:2px 6px">✕</button>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+function refreshDispoDays(){const el=document.getElementById('dispo-days');if(el)el.innerHTML=buildDispoDays();}
+function dispoAdd(k){
+  const rs=_tmpDispoH[k],last=rs[rs.length-1];
+  const s=last?Math.min(last.e+60,22*60):10*60;rs.push({s,e:Math.min(s+5*60,1440)});refreshDispoDays();
+}
+function dispoFull(k){_tmpDispoH[k]=[{s:TL_S,e:1440}];refreshDispoDays();}
+function dispoNone(k){_tmpDispoH[k]=[];refreshDispoDays();}
+function dispoDel(k,i){_tmpDispoH[k].splice(i,1);refreshDispoDays();}
+function dispoSet(k,i,f,v){const m=hhmm2m(v,f==='e');if(m==null)return;_tmpDispoH[k][i][f]=m;}
+function copyDispoLundi(){
+  const src=_tmpDispoH.lun||[];
+  DISPO_JOURS.forEach(j=>{if(j.k!=='lun')_tmpDispoH[j.k]=src.map(r=>({...r}));});refreshDispoDays();
+}
+function saveDispo(empId){
+  const dispoH={};
+  for(const j of DISPO_JOURS){
+    const rs=_tmpDispoH[j.k]||[];
+    for(const r of rs){if(!(r.e>r.s)){alert(`${j.l} : l'heure de fin doit être après l'heure de début.`);return;}}
+    dispoH[j.k]=mergeRanges(rs);
+  }
+  const dispoNotes=document.getElementById('rh-dispo-notes')?.value||'';
+  db.collection('employees').doc(empId).update({dispoH,dispoNotes})
+    .then(()=>{_tmpDispoH=null;closeModal();renderRH();})
+    .catch(e=>alert('Erreur: '+e.message));
+}
+
+// ═══════════════════════════════════
 // MODULE ABSENCES (v29)
 // ═══════════════════════════════════
 const ABS_TYPES=[
@@ -1967,6 +2021,8 @@ function rulesCard(){
       • <b>CDD</b> : alerte 30 jours avant la fin, et si le contrat est expiré<br>
       • <b>Période d'essai</b> : alerte 14 jours avant la fin<br>
       • <b>Planning</b> : créneau planifié pendant une absence<br>
+      • <b>Disponibilités</b> : créneau à venir hors des plages de disponibilité de l'employé (zones grisées dans le planning, bordure rouge pointillée)<br>
+      • <b>Contrat</b> : créneau avant la date d'entrée ou après la fin du CDD<br>
       • <b>Arrêt maladie / accident du travail</b> : arrêt de travail attendu sous 48 h<br>
       • <b>Accident du travail</b> : déclaration à la CPAM sous 48 h<br>
       • <b>Visite de reprise</b> : après un arrêt maladie ≥ 60 jours ou un accident du travail ≥ 30 jours (à faire dans les 8 jours suivant le retour) — alerte de 14 jours avant à 8 jours après le retour<br>
@@ -1982,7 +2038,7 @@ function renderAbsences(){
   const ds=days(),today=todayIso(),j90=iso(addD(new Date(),-90));
   const list=ABS.filter(a=>!_absFilter||a.empId===_absFilter).sort((a,b)=>a.start<b.start?-1:1);
   const enCours=list.filter(a=>a.end>=today),passees=list.filter(a=>a.end<today&&a.end>=j90).reverse();
-  const alerts=getAbsAlerts();
+  const alerts=getAbsAlerts().concat(getPlanAlerts());
   const empOpts=S.emps.map(e=>`<option value="${e.id}" ${_absFilter===e.id?'selected':''}>${e.prenom} ${e.nom}</option>`).join('');
   const absRow=a=>{
     const emp=S.emps.find(e=>e.id===a.empId),t=absType(a.type);

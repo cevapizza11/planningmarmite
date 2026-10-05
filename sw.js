@@ -1,5 +1,5 @@
 // La Marmite Bleue – Planning · Service Worker
-const CACHE = 'marmite-v29';
+const CACHE = 'marmite-v30';
 const CORE = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {

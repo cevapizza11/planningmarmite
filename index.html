@@ -86,12 +86,31 @@ button,input,select,textarea{font-family:inherit;cursor:pointer}
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <div id="loading">
   <div style="font-size:40px">🫙</div>
   <div class="spinner"></div>
   <div style="font-size:13px;color:#64748B;font-weight:500">Connexion Firebase…</div>
+</div>
+
+<div id="login" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#0EA5E9,#0369A1);z-index:9000;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:16px;padding:22px;width:100%;max-width:360px;box-shadow:0 10px 40px rgba(0,0,0,.25)">
+    <div style="text-align:center;font-size:36px">🫙</div>
+    <div style="text-align:center;font-weight:800;font-size:17px;color:#0F172A">La Marmite Bleue</div>
+    <div style="text-align:center;font-size:11px;color:#64748B;margin-bottom:16px">🔒 Accès gérant — Planning &amp; RH</div>
+    <label class="fld-lbl">Email</label>
+    <input class="fld-inp" id="lg-email" type="email" autocomplete="username" style="margin-bottom:10px">
+    <label class="fld-lbl">Mot de passe</label>
+    <input class="fld-inp" id="lg-pass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    <div id="lg-msg" style="font-size:12px;min-height:18px;margin:8px 0;color:#DC2626"></div>
+    <button class="btn-pri" style="width:100%;padding:11px;font-size:14px" onclick="doLogin()">Se connecter</button>
+    <div style="display:flex;justify-content:space-between;margin-top:12px;gap:8px">
+      <button onclick="doResetPass()" style="background:none;border:none;color:#0369A1;font-size:11px;text-decoration:underline">Mot de passe oublié</button>
+      <button onclick="doCreateAccount()" style="background:none;border:none;color:#0369A1;font-size:11px;text-decoration:underline">Première connexion : créer le compte</button>
+    </div>
+  </div>
 </div>
 
 <div id="app">
@@ -102,7 +121,7 @@ button,input,select,textarea{font-family:inherit;cursor:pointer}
       <div style="font-size:9px;opacity:.7;letter-spacing:.8px">PLANIFICATION DU PERSONNEL</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
-      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.05/10/2026 11:45</div>
+      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.05/10/2026 14:30</div>
       <div id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:#FCD34D;transition:background .3s" title="Sync Firebase"></div>
     </div>
   </div>
@@ -143,6 +162,12 @@ firebase.initializeApp({
 });
 const db     = firebase.firestore();
 const DOCREF = db.collection('marmite-planning').doc('state');
+const auth   = firebase.auth();
+// 🔒 Seul ce compte (email vérifié) peut lire/écrire les données sensibles (collection employees-private)
+const ADMIN_EMAIL = 'tmjumeaux@gmail.com';
+// Champs déplacés hors de 'employees' (lisible par la pointeuse) vers 'employees-private' (protégé)
+const PRIV_FIELDS = ['nir','grossSalary','address','phone','email'];
+const PRIVREF = db.collection('employees-private');
 
 // ═══════════════════════════════════
 // MODÈLES DE CONTRAT (base64 par défaut)
@@ -204,6 +229,7 @@ let S={
 };
 let MON=monday(new Date()),SEL=iso(new Date()),curTab='planning';
 let saveT=null,DRAG=null,_unsub=null,_unsubEmps=null,_unsubTemplates=null,_rhEmpTab='identite';
+let _unsubPriv=null,_pubRaw={},_priv={},_pubLoaded=false,_privLoaded=false,_migrated={},_started=false;
 
 // ═══════════════════════════════════
 // UTILS
@@ -348,6 +374,52 @@ function applyData(d){
 // ═══════════════════════════════════
 function init(){
   if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  auth.onAuthStateChanged(user=>{
+    if(user&&user.email===ADMIN_EMAIL&&user.emailVerified){
+      document.getElementById('login').style.display='none';
+      if(!_started){_started=true;initData();}
+    }else{
+      if(user&&user.email!==ADMIN_EMAIL){auth.signOut();loginMsg('Ce compte n\'est pas autorisé.');}
+      else if(user&&!user.emailVerified){loginMsg('Email pas encore vérifié : cliquez sur le lien reçu par mail, puis reconnectez-vous.','#D97706');auth.signOut();}
+      document.getElementById('loading').style.display='none';
+      document.getElementById('login').style.display='flex';
+      const e=document.getElementById('lg-email');if(e&&!e.value)e.value=ADMIN_EMAIL;
+    }
+  });
+}
+function loginMsg(t,col){const m=document.getElementById('lg-msg');if(m){m.style.color=col||'#DC2626';m.textContent=t;}}
+function lgVals(){return{em:(document.getElementById('lg-email').value||'').trim().toLowerCase(),pw:document.getElementById('lg-pass').value||''};}
+function authErr(e){
+  const c=e.code||'';
+  if(c.includes('invalid-credential')||c.includes('wrong-password')||c.includes('user-not-found'))return'Email ou mot de passe incorrect.';
+  if(c.includes('too-many-requests'))return'Trop de tentatives, réessayez dans quelques minutes.';
+  if(c.includes('email-already-in-use'))return'Ce compte existe déjà : connectez-vous (ou « Mot de passe oublié »).';
+  if(c.includes('weak-password'))return'Mot de passe trop court (8 caractères minimum conseillés).';
+  if(c.includes('operation-not-allowed'))return'Activez « Email/Mot de passe » dans Firebase › Authentication.';
+  if(c.includes('network'))return'Pas de connexion internet.';
+  return e.message;
+}
+function doLogin(){
+  const{em,pw}=lgVals();if(!em||!pw){loginMsg('Email et mot de passe requis.');return;}
+  if(em!==ADMIN_EMAIL){loginMsg('Ce compte n\'est pas autorisé.');return;}
+  loginMsg('Connexion…','#0369A1');
+  auth.signInWithEmailAndPassword(em,pw).catch(e=>loginMsg(authErr(e)));
+}
+function doCreateAccount(){
+  const{em,pw}=lgVals();
+  if(em!==ADMIN_EMAIL){loginMsg('Seul '+ADMIN_EMAIL+' peut créer le compte gérant.');return;}
+  if(pw.length<8){loginMsg('Choisissez un mot de passe d\'au moins 8 caractères.');return;}
+  auth.createUserWithEmailAndPassword(em,pw)
+    .then(c=>c.user.sendEmailVerification())
+    .then(()=>{auth.signOut();loginMsg('✅ Compte créé. Ouvrez le mail de vérification envoyé à '+em+', cliquez le lien, puis connectez-vous.','#16A34A');})
+    .catch(e=>loginMsg(authErr(e)));
+}
+function doResetPass(){
+  const{em}=lgVals();if(!em){loginMsg('Saisissez votre email.');return;}
+  auth.sendPasswordResetEmail(em).then(()=>loginMsg('📧 Email de réinitialisation envoyé.','#16A34A')).catch(e=>loginMsg(authErr(e)));
+}
+function doLogout(){if(confirm('Se déconnecter ?'))auth.signOut().then(()=>location.reload());}
+function initData(){
   DOCREF.get()
     .then(snap=>{
       applyData(snap.exists?snap.data():null);
@@ -355,6 +427,7 @@ function init(){
       startApp();
       startSync();
       listenEmployees();
+      listenPrivate();
       listenTemplates();
     })
     .catch(e=>{
@@ -362,6 +435,7 @@ function init(){
       dot('err');
       startApp();
       listenEmployees();
+      listenPrivate();
       listenTemplates();
     });
 }
@@ -386,8 +460,37 @@ function listenEmployees(){
   if(_unsubEmps)_unsubEmps();
   _unsubEmps=db.collection('employees').where('active','==',true).orderBy('name')
     .onSnapshot(snap=>{
-      S.emps=snap.docs.map(d=>{
-        const data=d.data();
+      _pubRaw={};snap.docs.forEach(d=>{_pubRaw[d.id]=d.data();});
+      _pubLoaded=true;rebuildEmps();migratePrivate();
+    },e=>console.error('Employees listener:',e));
+}
+function listenPrivate(){
+  if(_unsubPriv)_unsubPriv();
+  _unsubPriv=PRIVREF.onSnapshot(snap=>{
+    _priv={};snap.docs.forEach(d=>{_priv[d.id]=d.data();});
+    _privLoaded=true;rebuildEmps();migratePrivate();
+  },e=>{console.error('Private listener:',e);if(e.code==='permission-denied')alert('🔒 Accès aux données sensibles refusé. Vérifiez les règles Firestore (collection employees-private).');});
+}
+// Déplace une seule fois les champs sensibles encore présents dans 'employees' vers 'employees-private'
+function migratePrivate(){
+  if(!_pubLoaded||!_privLoaded)return;
+  Object.entries(_pubRaw).forEach(([id,data])=>{
+    if(_migrated[id])return;
+    const found=PRIV_FIELDS.filter(f=>data[f]!==undefined);
+    if(!found.length)return;
+    _migrated[id]=true;
+    const toPriv={},toDel={},pv=_priv[id]||{};
+    found.forEach(f=>{if(pv[f]==null||pv[f]==='')toPriv[f]=data[f];toDel[f]=firebase.firestore.FieldValue.delete();});
+    PRIVREF.doc(id).set(toPriv,{merge:true})
+      .then(()=>db.collection('employees').doc(id).update(toDel))
+      .catch(e=>{console.error('Migration '+id,e);_migrated[id]=false;});
+  });
+}
+function rebuildEmps(){
+      S.emps=Object.entries(_pubRaw).sort((a,b)=>(a[1].name||'').localeCompare(b[1].name||'')).map(([docId,pub])=>{
+        const pv=_priv[docId]||{};
+        const data={...pub,...Object.fromEntries(PRIV_FIELDS.filter(f=>pv[f]!==undefined).map(f=>[f,pv[f]]))};
+        const d={id:docId};
         const parts=(data.name||'').trim().split(' ');
         const prenom=parts[0]||'';
         const nom=parts.slice(1).join(' ')||'';
@@ -419,7 +522,6 @@ function listenEmployees(){
         };
       });
       if(curTab)refreshTab();
-    },e=>console.error('Employees listener:',e));
 }
 function refreshTab(){
   if(curTab==='planning')renderPlanning();
@@ -1091,7 +1193,8 @@ function saveIdentite(empId){
   const nir=cleanNIR(document.getElementById('rh-nir').value);
   if(nir&&!nirValid(nir)){if(!confirm('Le n° de Sécurité Sociale semble incorrect (clé invalide). Enregistrer quand même ?'))return;}
   const name=`${prenom} ${nom}`;
-  db.collection('employees').doc(empId).update({name,phone,email,address,nir})
+  db.collection('employees').doc(empId).update({name})
+    .then(()=>PRIVREF.doc(empId).set({phone,email,address,nir},{merge:true}))
     .then(()=>{closeModal();renderRH();})
     .catch(e=>alert('Erreur: '+e.message));
 }
@@ -1105,11 +1208,12 @@ function saveContrat(empId){
   const trialVal=document.getElementById('rh-trial').value;
   const contractTemplate=document.getElementById('rh-ctpl')?.value||'equipier';
   const data={contractType,contractHours,contractTemplate,postes:[...mPostes]};
-  if(grossSalary)data.grossSalary=grossSalary;
+
   if(csVal)data.contractStart=firebase.firestore.Timestamp.fromDate(new Date(csVal));
   if(ceVal&&contractType==='CDD')data.contractEnd=firebase.firestore.Timestamp.fromDate(new Date(ceVal));
   if(trialVal)data.trialEndDate=firebase.firestore.Timestamp.fromDate(new Date(trialVal));
   db.collection('employees').doc(empId).update(data)
+    .then(()=>PRIVREF.doc(empId).set({grossSalary:grossSalary||null},{merge:true}))
     .then(()=>{closeModal();renderRH();})
     .catch(e=>alert('Erreur: '+e.message));
 }
@@ -1336,6 +1440,16 @@ function renderParams(){
       <div style="font-size:12px;color:#64748B;margin-bottom:2px">Projet : <strong>pointagemarmitebleue</strong></div>
       <div style="font-size:12px;color:#64748B;margin-bottom:10px">Collection : <strong>marmite-planning / state</strong></div>
       <button onclick="dbSave()" class="btn-sec" style="width:100%;padding:9px;border-radius:8px;font-size:13px">🔄 Forcer la synchronisation</button>
+    </div>
+    <div class="card" style="padding:14px;margin-top:10px">
+      <div style="font-size:13px;font-weight:700;color:#0F172A;margin-bottom:7px">🔒 Sécurité des données</div>
+      <div style="font-size:12px;color:#64748B;margin-bottom:6px">Connecté : <strong>${auth.currentUser?auth.currentUser.email:'—'}</strong></div>
+      <div style="font-size:11px;color:#374151;line-height:1.6;margin-bottom:10px">
+        Données protégées (collection <strong>employees-private</strong>, lisibles uniquement par le compte gérant vérifié) :<br>
+        • N° de Sécurité Sociale<br>• Salaire brut<br>• Adresse<br>• Téléphone<br>• Email<br>
+        <span style="color:#64748B">Restent dans <strong>employees</strong> (utilisés par la pointeuse) : nom, postes, heures, type de contrat, dates, disponibilités, PIN.</span>
+      </div>
+      <button onclick="doLogout()" class="btn-sec" style="width:100%;padding:9px;border-radius:8px;font-size:13px;color:#BE123C">🚪 Se déconnecter</button>
     </div>
   </div>`;
 }

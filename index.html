@@ -121,18 +121,19 @@ button,input,select,textarea{font-family:inherit;cursor:pointer}
       <div style="font-size:9px;opacity:.7;letter-spacing:.8px">PLANIFICATION DU PERSONNEL</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
-      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.05/10/2026 14:30</div>
+      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.05/10/2026 16:15</div>
       <div id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:#FCD34D;transition:background .3s" title="Sync Firebase"></div>
     </div>
   </div>
   <nav class="nav">
-    <button class="nav-btn active" onclick="showTab('planning')"><span class="ico">📅</span>Planning</button>
-    <button class="nav-btn" onclick="showTab('tableau')"><span class="ico">📊</span>Tableau</button>
-    <button class="nav-btn" onclick="showTab('position')"><span class="ico">📋</span>Position</button>
-    <button class="nav-btn" onclick="showTab('employes')"><span class="ico">👥</span>Équipe</button>
-    <button class="nav-btn" onclick="showTab('export')"><span class="ico">📄</span>Export</button>
-    <button class="nav-btn" onclick="showTab('rh')"><span class="ico">🗂️</span>RH</button>
-    <button class="nav-btn" onclick="showTab('params')"><span class="ico">⚙️</span>Params</button>
+    <button class="nav-btn active" data-tab="planning" onclick="showTab('planning')"><span class="ico">📅</span>Planning</button>
+    <button class="nav-btn" data-tab="tableau" onclick="showTab('tableau')"><span class="ico">📊</span>Tableau</button>
+    <button class="nav-btn" data-tab="position" onclick="showTab('position')"><span class="ico">📋</span>Position</button>
+    <button class="nav-btn" data-tab="employes" onclick="showTab('employes')"><span class="ico">👥</span>Équipe</button>
+    <button class="nav-btn" data-tab="export" onclick="showTab('export')"><span class="ico">📄</span>Export</button>
+    <button class="nav-btn" data-tab="rh" onclick="showTab('rh')"><span class="ico">🗂️</span>RH</button>
+    <button class="nav-btn" data-tab="absences" onclick="showTab('absences')"><span class="ico">🏖️</span>Absences</button>
+    <button class="nav-btn" data-tab="params" onclick="showTab('params')"><span class="ico">⚙️</span>Params</button>
   </nav>
   <div class="main">
     <div id="tab-planning"></div>
@@ -141,6 +142,7 @@ button,input,select,textarea{font-family:inherit;cursor:pointer}
     <div id="tab-employes" style="display:none"></div>
     <div id="tab-export"   style="display:none"></div>
     <div id="tab-rh"      style="display:none"></div>
+    <div id="tab-absences" style="display:none"></div>
     <div id="tab-params"   style="display:none"></div>
   </div>
 </div>
@@ -351,7 +353,7 @@ function dot(s){const d=document.getElementById('sync-dot');if(d)d.style.backgro
 function autoSave(){clearTimeout(saveT);saveT=setTimeout(dbSave,1500);}
 function dbSave(){
   dot('sync');
-  const {emps,...rest}=S;
+  const {emps,templates,...rest}=S;
   DOCREF.set(rest)
     .then(()=>dot('ok'))
     .catch(e=>{console.error('Save:',e);dot('err');});
@@ -428,6 +430,7 @@ function initData(){
       startSync();
       listenEmployees();
       listenPrivate();
+      listenAbsences();
       listenTemplates();
     })
     .catch(e=>{
@@ -436,6 +439,7 @@ function initData(){
       startApp();
       listenEmployees();
       listenPrivate();
+      listenAbsences();
       listenTemplates();
     });
 }
@@ -518,7 +522,8 @@ function rebuildEmps(){
           dispo:data.dispo||{lun:{mat:true,am:true,soir:true},mar:{mat:true,am:true,soir:true},mer:{mat:true,am:true,soir:true},jeu:{mat:true,am:true,soir:true},ven:{mat:true,am:true,soir:true},sam:{mat:true,am:true,soir:true},dim:{mat:false,am:false,soir:false}},
           dispoNotes:data.dispoNotes||'',
           nir:data.nir||'',
-          contractTemplate:data.contractTemplate||'equipier'
+          contractTemplate:data.contractTemplate||'equipier',
+          cpReport:+(data.cpReport||0)
         };
       });
       if(curTab)refreshTab();
@@ -529,17 +534,18 @@ function refreshTab(){
   else if(curTab==='position')renderPosition();
   else if(curTab==='employes')renderEmployes();
   else if(curTab==='rh')renderRH();
+  else if(curTab==='absences')renderAbsences();
   else if(curTab==='export')renderExport();
 }
 
 // ═══════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════
-const TABS=['planning','tableau','position','employes','rh','export','params'];
+const TABS=['planning','tableau','position','employes','export','rh','absences','params'];
 function showTab(t){
   curTab=t;
   TABS.forEach(k=>{document.getElementById('tab-'+k).style.display=k===t?'':'none';});
-  document.querySelectorAll('.nav-btn').forEach((b,i)=>b.classList.toggle('active',TABS[i]===t));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
   refreshTab();
   if(t==='params')renderParams();
 }
@@ -568,7 +574,7 @@ function autoGen(){
     const dk=iso(day);let si=0;
     getPostes().forEach(p=>{
       const need=(calcNeeds(S.fc[dk]||{}))[p.id];if(!need)return;
-      const cands=S.emps.filter(e=>(e.postes||[]).includes(p.id)&&!np[dk][e.id]?.length&&worked[e.id]<target[e.id])
+      const cands=S.emps.filter(e=>(e.postes||[]).includes(p.id)&&!absOn(e.id,dk)&&!np[dk][e.id]?.length&&worked[e.id]<target[e.id])
         .sort((a,b)=>(target[b.id]-worked[b.id])-(target[a.id]-worked[a.id]));
       let n=0;for(const emp of cands){if(n>=need)break;const sl=AUTO_SL[si%AUTO_SL.length];np[dk][emp.id]=[{s:sl.s,e:sl.e,poste:p.id}];worked[emp.id]++;n++;si++;}
     });
@@ -581,13 +587,14 @@ function autoGen(){
 // SHIFTS
 // ═══════════════════════════════════
 function addShift(eid,dk){
+  if(!absGuard(eid,dk))return;
   const emp=S.emps.find(e=>e.id===eid),ex=shifts(dk,eid);
   let ns=19*60,ne=23*60;
   if(ex.length){const last=ex.reduce((a,b)=>b.e>a.e?b:a);ns=snap(Math.min(last.e+60,TL_E-MIN_D));ne=Math.min(ns+MIN_D,TL_E);}
   setShifts(dk,eid,[...ex,{s:ns,e:ne,poste:mainP(emp||{})}]);renderPlanning();
 }
 function delShift(eid,dk,idx){setShifts(dk,eid,shifts(dk,eid).filter((_,i)=>i!==idx));renderPlanning();}
-function createFirst(eid,dk){const emp=S.emps.find(e=>e.id===eid);setShifts(dk,eid,[{s:11*60+30,e:17*60+30,poste:mainP(emp||{})}]);renderPlanning();}
+function createFirst(eid,dk){if(!absGuard(eid,dk))return;const emp=S.emps.find(e=>e.id===eid);setShifts(dk,eid,[{s:11*60+30,e:17*60+30,poste:mainP(emp||{})}]);renderPlanning();}
 
 // ═══════════════════════════════════
 // PICKER POSTE
@@ -666,7 +673,7 @@ function pUp(e){
   if(!DRAG)return;
   const{x,y}=coord(e),d=DRAG;DRAG=null;document.body.style.cursor='';
   if(d.type==='poste'){if(Math.abs(x-d.x0)<8&&Math.abs(y-d.y0)<8){const b=d.el.closest('[data-blk]');if(b)showPostePicker(b.dataset.eid,b.dataset.dk,+b.dataset.idx,d.el);}return;}
-  if(d.type==='click'){if(Math.abs(x-d.x0)<8&&Math.abs(y-d.y0)<8){const rect=d.track.getBoundingClientRect(),cm=snap(clamp(px2m(x-rect.left),TL_S,TL_E-MIN_D));const emp=S.emps.find(e=>e.id===d.eid);setShifts(d.dk,d.eid,[...shifts(d.dk,d.eid),{s:cm,e:Math.min(cm+MIN_D,TL_E),poste:mainP(emp||{})}]);renderPlanning();}return;}
+  if(d.type==='click'){if(Math.abs(x-d.x0)<8&&Math.abs(y-d.y0)<8){if(!absGuard(d.eid,d.dk))return;const rect=d.track.getBoundingClientRect(),cm=snap(clamp(px2m(x-rect.left),TL_S,TL_E-MIN_D));const emp=S.emps.find(e=>e.id===d.eid);setShifts(d.dk,d.eid,[...shifts(d.dk,d.eid),{s:cm,e:Math.min(cm+MIN_D,TL_E),poste:mainP(emp||{})}]);renderPlanning();}return;}
   if(d.moved){const arr=shifts(d.dk,d.eid);if(arr[d.idx]){arr[d.idx].s=d.cs;arr[d.idx].e=d.ce;setShifts(d.dk,d.eid,arr);renderPlanning();}}
 }
 
@@ -751,6 +758,7 @@ function buildTimeline(dk){
             <div style="flex:1;min-width:0">
               <div style="font-weight:600;font-size:12px;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${emp.prenom} ${emp.nom}</div>
               <div style="font-size:10px;color:${over?'#DC2626':under?'#D97706':'#94A3B8'}">${wh}h/${emp.heures}h</div>
+              ${absOn(emp.id,dk)?`<div style="font-size:10px;font-weight:700;color:${absType(absOn(emp.id,dk).type).tx}">${absType(absOn(emp.id,dk).type).ico} Absent</div>`:''}
               ${dm?`<div style="font-size:10px;color:#0EA5E9;font-weight:600">${fDur(dm)}</div>`:''}
             </div>${addBtn}
           </div>
@@ -758,7 +766,7 @@ function buildTimeline(dk){
             style="position:relative;width:${TL_W}px;height:${rh}px;flex-shrink:0;background-color:${z};
               background-image:repeating-linear-gradient(90deg,transparent 0,transparent 119px,rgba(0,0,0,.04) 119px,rgba(0,0,0,.04) 120px);
               cursor:crosshair;touch-action:none">
-            ${nowLine}${buildBlocks(emp,shs,dk)}
+            ${nowLine}${absOverlay(emp.id,dk)}${buildBlocks(emp,shs,dk)}
           </div>
         </div>`;
       });
@@ -996,7 +1004,7 @@ function getCHRAlerts(){
       if(diff>0&&diff<=14) alerts.push({type:'info',ico:'📋',msg:`${emp.prenom} ${emp.nom} — Période d'essai se termine dans ${diff} jour${diff>1?'s':''}`});
     }
   });
-  return alerts;
+  return alerts.concat(typeof getAbsAlerts==='function'?getAbsAlerts():[]);
 }
 
 function openFicheRH(empId){
@@ -1375,7 +1383,7 @@ function renderExport(){
         ${ds.map(d=>{const dk=iso(d),shs=shifts(dk,emp.id),we=isWE(d);
           return`<div style="padding:6px 4px;border-right:1px solid #F1F5F9;min-height:65px;background:${we?'#FAFAFA':'#fff'}">
             <div style="font-size:9px;font-weight:600;color:${we?'#DC2626':'#64748B'};text-transform:capitalize;margin-bottom:3px;text-align:center">${fDay(d)}</div>
-            ${shs.length?shs.map(sh=>{const p=sh.poste||mainP(emp),psp=PS_[p]||ps;return`<div style="text-align:center;margin-bottom:2px;padding:3px;border-radius:5px;background:${psp.bg||'#EFF6FF'};border:1px solid ${psp.bd||'#BFDBFE'}"><div style="font-size:10px;font-weight:800;color:#0369A1">${fT(sh.s)}–${fT(sh.e)}</div><div style="font-size:8px;color:#64748B">${fDur(sh.e-sh.s)}</div><div style="font-size:8px;font-weight:700;color:${psp.tx||'#1E40AF'}">${p}</div></div>`;}).join(''):`<div style="font-size:10px;color:#CBD5E1;text-align:center;padding-top:6px">Repos</div>`}
+            ${shs.length?shs.map(sh=>{const p=sh.poste||mainP(emp),psp=PS_[p]||ps;return`<div style="text-align:center;margin-bottom:2px;padding:3px;border-radius:5px;background:${psp.bg||'#EFF6FF'};border:1px solid ${psp.bd||'#BFDBFE'}"><div style="font-size:10px;font-weight:800;color:#0369A1">${fT(sh.s)}–${fT(sh.e)}</div><div style="font-size:8px;color:#64748B">${fDur(sh.e-sh.s)}</div><div style="font-size:8px;font-weight:700;color:${psp.tx||'#1E40AF'}">${p}</div></div>`;}).join(''):absCell(emp.id,dk)}
           </div>`;}).join('')}
       </div>
     </div>`;
@@ -1389,7 +1397,7 @@ function buildPrintEmp(emp){
     <div style="text-align:right"><div style="font-size:10px;color:#64748B">Contrat</div><div style="font-size:16px;font-weight:800">${emp.heures}h/sem</div></div>
   </div>
   <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">
-    ${ds.map(d=>{const dk=iso(d),shs=shifts(dk,emp.id),we=isWE(d);return`<div style="border:1px solid #E2E8F0;border-radius:5px;padding:7px 5px;min-height:85px;background:${we?'#FAFAFA':'#fff'}"><div style="font-size:10px;font-weight:700;color:${we?'#DC2626':'#374151'};text-align:center;margin-bottom:3px;text-transform:capitalize">${fDay(d)}</div>${shs.length?shs.map(sh=>{const p=sh.poste||mainP(emp),psp=PS_[p]||ps;return`<div style="margin-bottom:3px;padding:4px;border-radius:4px;background:${psp.bg||'#EFF6FF'};text-align:center"><div style="font-size:12px;font-weight:800;color:#0369A1">${fT(sh.s)}–${fT(sh.e)}</div><div style="font-size:9px;color:#64748B">${fDur(sh.e-sh.s)}</div><div style="font-size:8px;font-weight:700;color:${psp.tx||'#1E40AF'}">${p}</div></div>`;}).join(''):`<div style="font-size:10px;color:#CBD5E1;text-align:center;padding-top:6px">Repos</div>`}</div>`;}).join('')}
+    ${ds.map(d=>{const dk=iso(d),shs=shifts(dk,emp.id),we=isWE(d);return`<div style="border:1px solid #E2E8F0;border-radius:5px;padding:7px 5px;min-height:85px;background:${we?'#FAFAFA':'#fff'}"><div style="font-size:10px;font-weight:700;color:${we?'#DC2626':'#374151'};text-align:center;margin-bottom:3px;text-transform:capitalize">${fDay(d)}</div>${shs.length?shs.map(sh=>{const p=sh.poste||mainP(emp),psp=PS_[p]||ps;return`<div style="margin-bottom:3px;padding:4px;border-radius:4px;background:${psp.bg||'#EFF6FF'};text-align:center"><div style="font-size:12px;font-weight:800;color:#0369A1">${fT(sh.s)}–${fT(sh.e)}</div><div style="font-size:9px;color:#64748B">${fDur(sh.e-sh.s)}</div><div style="font-size:8px;font-weight:700;color:${psp.tx||'#1E40AF'}">${p}</div></div>`;}).join(''):absCell(emp.id,dk)}</div>`;}).join('')}
   </div>
   <div style="margin-top:10px;padding:7px 10px;background:#F0F9FF;border-radius:6px;font-size:12px;color:#0369A1;font-weight:600">Total : <strong>${totH}h</strong>${totH>emp.heures?` ⚠️ Dépassement ${Math.round((totH-emp.heures)*10)/10}h`:''}</div>
   <div style="margin-top:16px;display:flex;justify-content:space-between"><div style="border-top:1px solid #374151;padding-top:5px;font-size:10px;color:#64748B;width:44%">Signature employé :</div><div style="border-top:1px solid #374151;padding-top:5px;font-size:10px;color:#64748B;width:44%">Signature employeur :</div></div>
@@ -1852,6 +1860,278 @@ async function generateContractWord(empId){
     console.error('Word generation error:',err);
     alert('Erreur lors de la génération Word : '+err.message);
   }
+}
+
+// ═══════════════════════════════════
+// MODULE ABSENCES (v29)
+// ═══════════════════════════════════
+const ABS_TYPES=[
+  {k:'CP', l:'Congés payés',         ico:'🏖️',bg:'#ECFEFF',bd:'#67E8F9',tx:'#155E75'},
+  {k:'MAL',l:'Arrêt maladie',        ico:'🤒',bg:'#FFF1F2',bd:'#FDA4AF',tx:'#9F1239',just:true,reprise:60},
+  {k:'AT', l:'Accident du travail',  ico:'🚑',bg:'#FEF2F2',bd:'#F87171',tx:'#991B1B',just:true,decl:true,reprise:30},
+  {k:'RC', l:'Repos compensateur',   ico:'😴',bg:'#F0FDF4',bd:'#86EFAC',tx:'#14532D'},
+  {k:'FAM',l:'Événement familial',   ico:'👨‍👩‍👧',bg:'#FAF5FF',bd:'#D8B4FE',tx:'#581C87'},
+  {k:'FOR',l:'Formation',            ico:'🎓',bg:'#EEF2FF',bd:'#A5B4FC',tx:'#3730A3'},
+  {k:'CSS',l:'Congé sans solde',     ico:'📭',bg:'#F8FAFC',bd:'#CBD5E1',tx:'#334155'},
+  {k:'ABI',l:'Absence injustifiée',  ico:'⚠️',bg:'#FFFBEB',bd:'#FCD34D',tx:'#92400E'},
+];
+let ABS=[],_unsubAbs=null,_absFilter='',_editAbs=null;
+
+function listenAbsences(){
+  if(_unsubAbs)_unsubAbs();
+  _unsubAbs=db.collection('absences').onSnapshot(snap=>{
+    ABS=snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(curTab)refreshTab();
+  },e=>{console.error('Absences listener:',e);if(e.code==='permission-denied')alert('🔒 Accès aux absences refusé. Mettez à jour les règles Firestore (collection absences).');});
+}
+function absType(k){return ABS_TYPES.find(t=>t.k===k)||ABS_TYPES[0];}
+function absOn(eid,dk){return ABS.find(a=>a.empId===eid&&a.start<=dk&&a.end>=dk);}
+function todayIso(){return iso(new Date());}
+function fD(dk){return new Date(dk+'T12:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'});}
+function joursCal(a,b){return Math.round((new Date(b+'T12:00')-new Date(a+'T12:00'))/86400000)+1;}
+
+// Jours fériés (France métropolitaine)
+function easter(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;return new Date(y,mo-1,da,12);}
+const _ferCache={};
+function feries(y){
+  if(_ferCache[y])return _ferCache[y];
+  const e=easter(y);
+  return _ferCache[y]=new Set([`${y}-01-01`,`${y}-05-01`,`${y}-05-08`,`${y}-07-14`,`${y}-08-15`,`${y}-11-01`,`${y}-11-11`,`${y}-12-25`,iso(addD(e,1)),iso(addD(e,39)),iso(addD(e,50))]);
+}
+// Jours ouvrables = lundi→samedi hors fériés (décompte légal des CP)
+function joursOuvrables(a,b){let n=0;for(let d=new Date(a+'T12:00');iso(d)<=b;d=addD(d,1)){if(d.getDay()!==0&&!feries(d.getFullYear()).has(iso(d)))n++;}return n;}
+function absDuree(a){return a.type==='CP'?joursOuvrables(a.start,a.end)+' j ouvr.':joursCal(a.start,a.end)+' j';}
+
+// Compteur CP — période de référence 1er juin → 31 mai
+function cpPeriode(){const t=new Date(),y=t.getMonth()>=5?t.getFullYear():t.getFullYear()-1;return{deb:`${y}-06-01`,fin:`${y+1}-05-31`};}
+function cpCompteur(emp){
+  const{deb,fin}=cpPeriode(),today=todayIso();
+  let from=deb;
+  if(emp.contractStart){const cs=iso(emp.contractStart.toDate?emp.contractStart.toDate():new Date(emp.contractStart));if(cs>from)from=cs;}
+  const to=today<fin?today:fin;
+  const mois=from<=to?Math.floor(joursCal(from,to)/30.4375):0;
+  const acquis=Math.min(30,Math.round(mois*2.5*10)/10);
+  const pris=ABS.filter(a=>a.empId===emp.id&&a.type==='CP'&&a.end>=deb&&a.start<=fin)
+    .reduce((s,a)=>s+joursOuvrables(a.start>deb?a.start:deb,a.end<fin?a.end:fin),0);
+  const report=+emp.cpReport||0;
+  return{report,acquis,pris,solde:Math.round((report+acquis-pris)*10)/10};
+}
+
+// Créneaux planifiés pendant une absence
+function absConflicts(empId,start,end){
+  return Object.keys(S.plan).filter(dk=>dk>=start&&dk<=end&&shifts(dk,empId).length).sort();
+}
+function absGuard(eid,dk){
+  const a=absOn(eid,dk);if(!a)return true;
+  const emp=S.emps.find(e=>e.id===eid),t=absType(a.type);
+  return confirm(`${emp?emp.prenom:''} est absent(e) ce jour (${t.ico} ${t.l}).\nPlanifier quand même ?`);
+}
+function absCell(eid,dk){
+  const a=absOn(eid,dk);
+  if(!a)return`<div style="font-size:10px;color:#CBD5E1;text-align:center;padding-top:6px">Repos</div>`;
+  const t=absType(a.type);
+  return`<div style="font-size:10px;text-align:center;margin-top:4px;padding:4px 2px;border-radius:5px;background:${t.bg};border:1px solid ${t.bd};color:${t.tx};font-weight:700">${t.ico}<br>${t.l}</div>`;
+}
+function absOverlay(eid,dk){
+  const a=absOn(eid,dk);if(!a)return'';
+  const t=absType(a.type);
+  return`<div style="position:absolute;inset:0;z-index:1;pointer-events:none;background:repeating-linear-gradient(135deg,${t.bg} 0,${t.bg} 10px,${t.bd}55 10px,${t.bd}55 20px);display:flex;align-items:center;padding-left:${m2px(8*60)}px">
+    <span style="padding:3px 10px;border-radius:12px;background:#fff;border:1px solid ${t.bd};color:${t.tx};font-size:11px;font-weight:700">${t.ico} ${t.l} · du ${fD(a.start)} au ${fD(a.end)}</span>
+  </div>`;
+}
+
+// Alertes CHR liées aux absences
+function getAbsAlerts(){
+  const out=[],today=todayIso(),j2=iso(addD(new Date(),-2));
+  ABS.forEach(a=>{
+    const emp=S.emps.find(e=>e.id===a.empId);if(!emp)return;
+    const nm=`${emp.prenom} ${emp.nom}`,t=absType(a.type);
+    const conf=absConflicts(a.empId,a.start,a.end);
+    if(conf.length)out.push({type:'warn',ico:'📅',msg:`${nm} — ${conf.length} jour(s) avec créneau planifié pendant son absence (${t.l}) : ${conf.map(fD).join(', ')}`});
+    if(t.decl&&!a.declFaite)out.push({type:'warn',ico:a.start<j2?'🔴':'🚑',msg:`${nm} — Accident du travail du ${fD(a.start)} : déclaration CPAM à faire sous 48 h${a.start<j2?' (délai dépassé)':''}`});
+    if(t.just&&!a.justifRecu&&a.start<=j2)out.push({type:'warn',ico:'📄',msg:`${nm} — Arrêt de travail (${t.l}) du ${fD(a.start)} non reçu (à transmettre sous 48 h)`});
+    if(t.reprise&&joursCal(a.start,a.end)>=t.reprise){
+      const dRet=iso(addD(new Date(a.end+'T12:00'),1)),j14=iso(addD(new Date(),14)),j8=iso(addD(new Date(),-8));
+      if(dRet<=j14&&dRet>=j8&&!a.repriseFaite)out.push({type:'info',ico:'🩺',msg:`${nm} — Retour le ${fD(dRet)} après ${joursCal(a.start,a.end)} j d'arrêt : visite de reprise médecine du travail à organiser (dans les 8 jours)`});
+    }
+    if(a.type==='ABI'&&a.end<=today&&!a.regularise)out.push({type:'warn',ico:'⚠️',msg:`${nm} — Absence injustifiée du ${fD(a.start)} à régulariser (justificatif ou retenue sur salaire)`});
+  });
+  S.emps.forEach(emp=>{const c=cpCompteur(emp);if(c.solde<0)out.push({type:'warn',ico:'🏖️',msg:`${emp.prenom} ${emp.nom} — Solde de congés payés négatif (${c.solde} j)`});});
+  return out;
+}
+
+function rulesCard(){
+  return`<div class="rh-card">
+    <div class="rh-card-title">🛡️ Règles surveillées automatiquement</div>
+    <div style="font-size:11px;color:#374151;line-height:1.7">
+      • <b>CDD</b> : alerte 30 jours avant la fin, et si le contrat est expiré<br>
+      • <b>Période d'essai</b> : alerte 14 jours avant la fin<br>
+      • <b>Planning</b> : créneau planifié pendant une absence<br>
+      • <b>Arrêt maladie / accident du travail</b> : arrêt de travail attendu sous 48 h<br>
+      • <b>Accident du travail</b> : déclaration à la CPAM sous 48 h<br>
+      • <b>Visite de reprise</b> : après un arrêt maladie ≥ 60 jours ou un accident du travail ≥ 30 jours (à faire dans les 8 jours suivant le retour) — alerte de 14 jours avant à 8 jours après le retour<br>
+      • <b>Congés payés</b> : solde négatif (2,5 jours ouvrables acquis par mois, 30 j max, période du 1er juin au 31 mai)<br>
+      • <b>Absence injustifiée</b> : à régulariser une fois terminée
+    </div>
+    <div style="font-size:10px;color:#94A3B8;margin-top:6px">CP décomptés en jours ouvrables (lundi → samedi, hors jours fériés). Le compteur est une estimation : à rapprocher de la fiche de paie.</div>
+  </div>`;
+}
+
+function renderAbsences(){
+  const el=document.getElementById('tab-absences');if(!el)return;
+  const ds=days(),today=todayIso(),j90=iso(addD(new Date(),-90));
+  const list=ABS.filter(a=>!_absFilter||a.empId===_absFilter).sort((a,b)=>a.start<b.start?-1:1);
+  const enCours=list.filter(a=>a.end>=today),passees=list.filter(a=>a.end<today&&a.end>=j90).reverse();
+  const alerts=getAbsAlerts();
+  const empOpts=S.emps.map(e=>`<option value="${e.id}" ${_absFilter===e.id?'selected':''}>${e.prenom} ${e.nom}</option>`).join('');
+  const absRow=a=>{
+    const emp=S.emps.find(e=>e.id===a.empId),t=absType(a.type);
+    const flags=[];
+    if(t.just)flags.push(a.justifRecu?'📄 Arrêt reçu ✓':'📄 Arrêt non reçu');
+    if(t.decl)flags.push(a.declFaite?'🚑 Déclaré ✓':'🚑 À déclarer');
+    return`<div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;border:1px solid ${t.bd};background:${t.bg};margin-bottom:6px">
+      <div style="font-size:20px">${t.ico}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:13px;color:#0F172A">${emp?emp.prenom+' '+emp.nom:'(employé supprimé)'}</div>
+        <div style="font-size:11px;color:${t.tx};font-weight:600">${t.l} · ${fD(a.start)} → ${fD(a.end)} · ${absDuree(a)}</div>
+        ${flags.length?`<div style="font-size:10px;color:#64748B;margin-top:2px">${flags.join(' · ')}</div>`:''}
+        ${a.notes?`<div style="font-size:10px;color:#64748B;margin-top:2px;font-style:italic">${a.notes}</div>`:''}
+      </div>
+      <button onclick="openAbsModal('${a.id}')" style="background:#fff;border:1px solid #E2E8F0;padding:6px 9px;border-radius:7px;font-size:12px">✏️</button>
+      <button onclick="delAbs('${a.id}')" style="background:#FFF1F2;border:none;padding:6px 9px;border-radius:7px;font-size:12px;color:#BE123C">🗑️</button>
+    </div>`;
+  };
+  const grid=`<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;min-width:520px">
+    <tr><th style="text-align:left;font-size:10px;color:#64748B;padding:4px 6px">Employé</th>${ds.map(d=>`<th style="font-size:10px;color:${isWE(d)?'#DC2626':'#64748B'};padding:4px 2px;text-transform:capitalize">${fDay(d)}</th>`).join('')}</tr>
+    ${S.emps.map(e=>`<tr style="border-top:1px solid #F1F5F9"><td style="font-size:12px;font-weight:600;padding:5px 6px;white-space:nowrap">${e.prenom} ${e.nom}</td>${ds.map(d=>{const dk=iso(d),a=absOn(e.id,dk);
+      if(a){const t=absType(a.type);return`<td style="padding:2px"><div onclick="openAbsModal('${a.id}')" title="${t.l}" style="cursor:pointer;height:26px;border-radius:6px;background:${t.bg};border:1px solid ${t.bd};display:flex;align-items:center;justify-content:center;font-size:13px">${t.ico}</div></td>`;}
+      return`<td style="padding:2px"><div onclick="openAbsModal(null,'${e.id}','${dk}')" style="cursor:pointer;height:26px;border-radius:6px;border:1px dashed #E2E8F0;display:flex;align-items:center;justify-content:center;font-size:11px;color:${shifts(dk,e.id).length?'#0EA5E9':'#E2E8F0'}">${shifts(dk,e.id).length?'●':'+'}</div></td>`;}).join('')}</tr>`).join('')}
+  </table></div>`;
+  const cps=S.emps.map(e=>{const c=cpCompteur(e);return`<tr style="border-top:1px solid #F1F5F9">
+    <td style="font-size:12px;font-weight:600;padding:6px">${e.prenom} ${e.nom}</td>
+    <td style="text-align:center;font-size:12px"><button onclick="editCpReport('${e.id}')" style="background:#F1F5F9;border:none;padding:3px 8px;border-radius:6px;font-size:12px">${c.report} ✏️</button></td>
+    <td style="text-align:center;font-size:12px">+${c.acquis}</td>
+    <td style="text-align:center;font-size:12px">−${c.pris}</td>
+    <td style="text-align:center;font-size:13px;font-weight:800;color:${c.solde<0?'#DC2626':'#16A34A'}">${c.solde} j</td></tr>`;}).join('');
+  const per=cpPeriode();
+  el.innerHTML=`
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+      <div><div style="font-size:17px;font-weight:800;color:#0F172A">🏖️ Absences</div><div style="font-size:12px;color:#64748B">${ABS.length} absence${ABS.length>1?'s':''} enregistrée${ABS.length>1?'s':''}</div></div>
+      <button class="btn-pri" onclick="openAbsModal(null)">+ Absence</button>
+    </div>
+    ${alerts.length?`<div style="margin-bottom:12px;display:flex;flex-direction:column;gap:6px">${alerts.map(a=>`<div class="alert-chr ${a.type}"><span>${a.ico}</span><span>${a.msg}</span></div>`).join('')}</div>`:`<div class="alert-chr ok" style="margin-bottom:12px"><span>✅</span><span>Aucune alerte en cours</span></div>`}
+    <div class="rh-section">
+      <div class="rh-card">
+        <div class="row" style="justify-content:space-between;margin-bottom:8px">
+          <div class="rh-card-title" style="margin:0">Semaine · ${fWk(MON)}</div>
+          <div class="row" style="gap:4px"><button class="btn-sec" onclick="changeWeek(-1)">‹</button><button class="btn-sec" onclick="goToday()">Auj.</button><button class="btn-sec" onclick="changeWeek(1)">›</button></div>
+        </div>
+        ${S.emps.length?grid:'<div style="font-size:12px;color:#94A3B8">Aucun employé</div>'}
+        <div style="font-size:10px;color:#94A3B8;margin-top:6px">Cliquez une case pour ajouter une absence · <span style="color:#0EA5E9">●</span> = créneau planifié</div>
+      </div>
+      <div class="rh-card">
+        <div class="row" style="justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+          <div class="rh-card-title" style="margin:0">En cours & à venir</div>
+          <select class="tag-select" style="width:auto;padding:5px 8px;font-size:12px" onchange="_absFilter=this.value;renderAbsences()"><option value="">Tous les employés</option>${empOpts}</select>
+        </div>
+        ${enCours.length?enCours.map(absRow).join(''):'<div style="font-size:12px;color:#94A3B8">Aucune absence prévue</div>'}
+      </div>
+      <div class="rh-card">
+        <div class="rh-card-title">Compteurs congés payés · ${fD(per.deb)} ${per.deb.slice(0,4)} → ${fD(per.fin)} ${per.fin.slice(0,4)}</div>
+        <div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%">
+          <tr style="font-size:10px;color:#64748B"><th style="text-align:left;padding:4px 6px">Employé</th><th>Report au 1/06</th><th>Acquis</th><th>Pris</th><th>Solde</th></tr>
+          ${cps}
+        </table></div>
+      </div>
+      <div class="rh-card">
+        <div class="rh-card-title">Historique (90 derniers jours)</div>
+        ${passees.length?passees.map(absRow).join(''):'<div style="font-size:12px;color:#94A3B8">Rien sur la période</div>'}
+      </div>
+      ${rulesCard()}
+    </div>`;
+}
+
+function editCpReport(empId){
+  const emp=S.emps.find(e=>e.id===empId);if(!emp)return;
+  const v=prompt(`Solde de CP de ${emp.prenom} au 1er juin (jours ouvrables, reporté de la fiche de paie) :`,emp.cpReport||0);
+  if(v===null)return;
+  const n=parseFloat(String(v).replace(',','.'));
+  if(isNaN(n)){alert('Nombre invalide');return;}
+  db.collection('employees').doc(empId).update({cpReport:n}).catch(e=>alert('Erreur: '+e.message));
+}
+
+function openAbsModal(absId,empId,dk){
+  const a=absId?ABS.find(x=>x.id===absId):null;
+  _editAbs=a;
+  const v=a||{empId:empId||_absFilter||(S.emps[0]&&S.emps[0].id)||'',type:'CP',start:dk||todayIso(),end:dk||todayIso(),notes:''};
+  document.getElementById('modal-root').innerHTML=`
+    <div class="overlay" onclick="if(event.target===this)closeModal()">
+      <div class="modal">
+        <div class="modal-hdr"><span>🏖️</span><span>${a?'Modifier l’absence':'Nouvelle absence'}</span></div>
+        <div class="modal-body">
+          <div><label class="fld-lbl">Employé</label>
+            <select class="tag-select" id="ab-emp" onchange="absPreview()">${S.emps.map(e=>`<option value="${e.id}" ${v.empId===e.id?'selected':''}>${e.prenom} ${e.nom}</option>`).join('')}</select></div>
+          <div><label class="fld-lbl">Type</label>
+            <select class="tag-select" id="ab-type" onchange="absPreview()">${ABS_TYPES.map(t=>`<option value="${t.k}" ${v.type===t.k?'selected':''}>${t.ico} ${t.l}</option>`).join('')}</select></div>
+          <div class="field-row">
+            <div><label class="fld-lbl">Du</label><input class="fld-inp" id="ab-start" type="date" value="${v.start}" onchange="if(document.getElementById('ab-end').value<this.value)document.getElementById('ab-end').value=this.value;absPreview()"></div>
+            <div><label class="fld-lbl">Au (inclus)</label><input class="fld-inp" id="ab-end" type="date" value="${v.end}" onchange="absPreview()"></div>
+          </div>
+          <div id="ab-flags"></div>
+          <div><label class="fld-lbl">Notes</label><textarea class="fld-inp" id="ab-notes" rows="2" placeholder="Ex : motif, n° d'arrêt…">${v.notes||''}</textarea></div>
+          <div id="ab-preview"></div>
+        </div>
+        <div class="modal-foot">
+          <button onclick="closeModal()" class="btn-sec">Annuler</button>
+          <button onclick="saveAbs()" class="btn-pri">${a?'Enregistrer':'Ajouter ✓'}</button>
+        </div>
+      </div>
+    </div>`;
+  absPreview();
+}
+function absPreview(){
+  const type=document.getElementById('ab-type').value,t=absType(type);
+  const s=document.getElementById('ab-start').value,e=document.getElementById('ab-end').value,emp=document.getElementById('ab-emp').value;
+  const a=_editAbs||{};
+  const prevFlags={};document.querySelectorAll('#ab-flags input').forEach(i=>{prevFlags[i.id]=i.checked;});
+  const ck=(id,lbl,val)=>`<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#374151;padding:6px 8px;border:1px solid #E2E8F0;border-radius:8px;margin-bottom:4px"><input type="checkbox" id="${id}" ${(prevFlags[id]??val)?'checked':''}> ${lbl}</label>`;
+  let f='';
+  if(t.just)f+=ck('ab-justif','📄 Arrêt de travail reçu',a.justifRecu);
+  if(t.decl)f+=ck('ab-decl','🚑 Déclaration AT faite (CPAM / net-entreprises)',a.declFaite);
+  if(t.reprise)f+=ck('ab-reprise','🩺 Visite de reprise organisée',a.repriseFaite);
+  if(type==='ABI')f+=ck('ab-regul','✅ Absence régularisée',a.regularise);
+  document.getElementById('ab-flags').innerHTML=f;
+  const box=document.getElementById('ab-preview');
+  if(!s||!e||e<s){box.innerHTML=`<div class="alert-chr warn"><span>⚠️</span><span>La date de fin doit être après la date de début</span></div>`;return;}
+  const conf=absConflicts(emp,s,e);
+  const overlap=ABS.find(x=>x.empId===emp&&x.id!==a.id&&x.start<=e&&x.end>=s);
+  let html=`<div class="alert-chr info"><span>📆</span><span>${joursCal(s,e)} jour(s) calendaire(s) · ${joursOuvrables(s,e)} jour(s) ouvrable(s)${type==='CP'?' décompté(s) des CP':''}</span></div>`;
+  if(type==='CP'){const em=S.emps.find(x=>x.id===emp);if(em){const c=cpCompteur(em),dej=a.id&&a.type==='CP'?joursOuvrables(a.start,a.end):0,apres=Math.round((c.solde+dej-joursOuvrables(s,e))*10)/10;html+=`<div class="alert-chr ${apres<0?'warn':'ok'}" style="margin-top:6px"><span>🏖️</span><span>Solde CP après cette absence : <b>${apres} j</b></span></div>`;}}
+  if(t.reprise&&joursCal(s,e)>=t.reprise)html+=`<div class="alert-chr info" style="margin-top:6px"><span>🩺</span><span>Arrêt ≥ ${t.reprise} jours : visite de reprise obligatoire dans les 8 jours suivant le retour</span></div>`;
+  if(overlap){const ot=absType(overlap.type);html+=`<div class="alert-chr warn" style="margin-top:6px"><span>⚠️</span><span>Chevauche une autre absence (${ot.l} du ${fD(overlap.start)} au ${fD(overlap.end)})</span></div>`;}
+  if(conf.length)html+=`<div class="alert-chr warn" style="margin-top:6px"><span>📅</span><span>${conf.length} jour(s) avec créneau planifié : ${conf.map(fD).join(', ')} — ils seront retirés du planning si vous confirmez</span></div>`;
+  box.innerHTML=html;
+}
+function saveAbs(){
+  const empId=document.getElementById('ab-emp').value,type=document.getElementById('ab-type').value;
+  const start=document.getElementById('ab-start').value,end=document.getElementById('ab-end').value;
+  const notes=(document.getElementById('ab-notes').value||'').trim();
+  if(!empId||!start||!end){alert('Employé et dates requis.');return;}
+  if(end<start){alert('La date de fin doit être après la date de début.');return;}
+  const a=_editAbs||{};
+  if(ABS.find(x=>x.empId===empId&&x.id!==a.id&&x.start<=end&&x.end>=start)&&!confirm('Cette absence chevauche une autre absence. Enregistrer quand même ?'))return;
+  const g=id=>{const el=document.getElementById(id);return el?el.checked:false;};
+  const data={empId,type,start,end,notes,justifRecu:g('ab-justif'),declFaite:g('ab-decl'),repriseFaite:g('ab-reprise'),regularise:g('ab-regul'),updatedAt:firebase.firestore.Timestamp.now()};
+  const conf=absConflicts(empId,start,end);
+  if(conf.length&&confirm(`${conf.length} jour(s) ont des créneaux planifiés pendant cette absence.\nLes retirer du planning ?`)){
+    conf.forEach(dk=>{if(S.plan[dk])S.plan[dk][empId]=[];});autoSave();
+  }
+  const op=a.id?db.collection('absences').doc(a.id).update(data):db.collection('absences').add({...data,createdAt:firebase.firestore.Timestamp.now()});
+  op.then(()=>{closeModal();refreshTab();}).catch(e=>alert('Erreur: '+e.message));
+}
+function delAbs(id){
+  if(!confirm('Supprimer cette absence ?'))return;
+  db.collection('absences').doc(id).delete().catch(e=>alert('Erreur: '+e.message));
 }
 
 // ═══════════════════════════════════

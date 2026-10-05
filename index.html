@@ -121,12 +121,13 @@ button,input,select,textarea{font-family:inherit;cursor:pointer}
       <div style="font-size:9px;opacity:.7;letter-spacing:.8px">PLANIFICATION DU PERSONNEL</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
-      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.05/10/2026 17:45</div>
+      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.05/10/2026 18:45</div>
       <div id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:#FCD34D;transition:background .3s" title="Sync Firebase"></div>
     </div>
   </div>
   <nav class="nav">
     <button class="nav-btn active" data-tab="planning" onclick="showTab('planning')"><span class="ico">📅</span>Planning</button>
+    <button class="nav-btn" data-tab="trames" onclick="showTab('trames')"><span class="ico">📐</span>Trames</button>
     <button class="nav-btn" data-tab="tableau" onclick="showTab('tableau')"><span class="ico">📊</span>Tableau</button>
     <button class="nav-btn" data-tab="position" onclick="showTab('position')"><span class="ico">📋</span>Position</button>
     <button class="nav-btn" data-tab="employes" onclick="showTab('employes')"><span class="ico">👥</span>Équipe</button>
@@ -137,6 +138,7 @@ button,input,select,textarea{font-family:inherit;cursor:pointer}
   </nav>
   <div class="main">
     <div id="tab-planning"></div>
+    <div id="tab-trames" style="display:none"></div>
     <div id="tab-tableau"  style="display:none"></div>
     <div id="tab-position" style="display:none"></div>
     <div id="tab-employes" style="display:none"></div>
@@ -227,7 +229,8 @@ const TL_W=(TL_E-TL_S)*PX,EC_W=130,BH=46,BG=6;
 let S={
   emps:[],templates:{},fc:{},plan:{},
   par:{ratioMoule:80,ratioFrite:100,ratioSalle:80,seuilBar:1500,seuilPlo:50,ticketMoyen:25},
-  postesConfig:[...DEFAULT_POSTES]
+  postesConfig:[...DEFAULT_POSTES],
+  trames:[]
 };
 let MON=monday(new Date()),SEL=iso(new Date()),curTab='planning';
 let saveT=null,DRAG=null,_unsub=null,_unsubEmps=null,_unsubTemplates=null,_rhEmpTab='identite';
@@ -364,6 +367,7 @@ function applyData(d){
   if(d.fc)S.fc=d.fc;
   if(d.par)S.par={...S.par,...d.par};
   if(d.postesConfig&&d.postesConfig.length)S.postesConfig=d.postesConfig;
+  if(Array.isArray(d.trames))S.trames=d.trames;
   if(d.plan){
     const np={};
     for(const dk in d.plan){np[dk]={};for(const eid in d.plan[dk]){const v=d.plan[dk][eid];np[dk][eid]=Array.isArray(v)?v:(v&&v.s!=null?[v]:[]);}}
@@ -538,13 +542,14 @@ function refreshTab(){
   else if(curTab==='employes')renderEmployes();
   else if(curTab==='rh')renderRH();
   else if(curTab==='absences')renderAbsences();
+  else if(curTab==='trames')renderTrames();
   else if(curTab==='export')renderExport();
 }
 
 // ═══════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════
-const TABS=['planning','tableau','position','employes','export','rh','absences','params'];
+const TABS=['planning','trames','tableau','position','employes','export','rh','absences','params'];
 function showTab(t){
   curTab=t;
   TABS.forEach(k=>{document.getElementById('tab-'+k).style.display=k===t?'':'none';});
@@ -698,6 +703,7 @@ function renderPlanning(){
       <div style="flex:1;text-align:center;min-width:110px"><div style="font-weight:700;font-size:13px;color:#0F172A">${fWk(MON)}</div></div>
       <button class="btn-sec" onclick="changeWeek(1)" style="font-size:17px;padding:6px 10px">›</button>
       <button class="btn-sec" onclick="goToday()" style="font-size:11px">Auj.</button>
+      <button class="btn-sec" onclick="openDispoTable()" style="font-size:12px">🗓️ Dispos</button>
       <button class="btn-pri" onclick="autoGen()">⚡ Générer</button>
     </div>
     <div class="pills" style="margin-bottom:8px">${pills}</div>
@@ -1949,6 +1955,263 @@ function saveDispo(empId){
   db.collection('employees').doc(empId).update({dispoH,dispoNotes})
     .then(()=>{_tmpDispoH=null;closeModal();renderRH();})
     .catch(e=>alert('Erreur: '+e.message));
+}
+
+// ═══════════════════════════════════
+// TABLEAU DES DISPONIBILITÉS (v32)
+// ═══════════════════════════════════
+function dispoCellInfo(emp,dk){
+  const a=absOn(emp.id,dk);
+  if(a){const t=absType(a.type);return{bg:t.bg,bd:t.bd,tx:t.tx,txt:`${t.ico} ${t.l}`,dispo:false};}
+  if(!inContract(emp,dk))return{bg:'#F1F5F9',bd:'#CBD5E1',tx:'#64748B',txt:'Hors contrat',dispo:false};
+  if(!emp.dispoSet)return{bg:'#FFFBEB',bd:'#FCD34D',tx:'#92400E',txt:'? À compléter',dispo:true};
+  const rs=dayRanges(emp,dk);
+  if(!rs.length)return{bg:'#FFF1F2',bd:'#FECDD3',tx:'#BE123C',txt:'Indispo',dispo:false};
+  return{bg:'#F0FDF4',bd:'#86EFAC',tx:'#15803D',txt:rs.map(r=>fT(r.s)+'–'+(r.e>=1440?'24h':fT(r.e))).join('<br>'),dispo:true};
+}
+function buildDispoTable(forPrint){
+  const ds=days();
+  const head=ds.map(d=>{const dk=iso(d),sel=dk===SEL&&!forPrint;
+    return`<th style="padding:6px 4px;font-size:11px;font-weight:700;color:${isWE(d)?'#DC2626':'#374151'};text-transform:capitalize;background:${sel?'#E0F2FE':'#F8FAFC'};border-bottom:2px solid #E2E8F0;min-width:84px">${fDay(d)}</th>`;}).join('');
+  const rows=S.emps.map((emp,i)=>`<tr>
+    <td style="padding:6px 8px;font-size:12px;font-weight:600;white-space:nowrap;border-bottom:1px solid #F1F5F9;position:sticky;left:0;background:${i%2?'#FAFCFF':'#fff'};z-index:1">${emp.prenom} ${emp.nom}<div style="font-size:10px;color:#94A3B8;font-weight:400">${emp.heures}h/sem</div></td>
+    ${ds.map(d=>{const dk=iso(d),c=dispoCellInfo(emp,dk),shs=shifts(dk,emp.id),sel=dk===SEL&&!forPrint;
+      return`<td ${forPrint?'':`onclick="closeModal();openFicheRH('${emp.id}');switchRHTab('${emp.id}','dispo')"`} style="padding:3px;border-bottom:1px solid #F1F5F9;background:${sel?'#F0F9FF':'transparent'};${forPrint?'':'cursor:pointer'}">
+        <div style="border-radius:7px;padding:5px 4px;text-align:center;background:${c.bg};border:1px solid ${c.bd};color:${c.tx};font-size:11px;font-weight:700;line-height:1.35">${c.txt}</div>
+        ${shs.length?`<div style="margin-top:2px;text-align:center;font-size:9px;font-weight:700;color:${shs.some(sh=>!isAvail(emp,dk,sh.s,sh.e))?'#DC2626':'#0369A1'}">📅 ${shs.map(sh=>fT(sh.s)+'–'+fT(sh.e)).join(' ')}</div>`:''}
+      </td>`;}).join('')}
+  </tr>`).join('');
+  const tot=ds.map(d=>{const dk=iso(d),n=S.emps.filter(e=>dispoCellInfo(e,dk).dispo).length;
+    return`<td style="padding:6px 4px;text-align:center;font-size:12px;font-weight:800;color:#0369A1;background:#F0F9FF;border-top:2px solid #BAE6FD">${n}</td>`;}).join('');
+  return`<table style="border-collapse:collapse;width:100%;min-width:${150+ds.length*88}px">
+    <thead><tr><th style="padding:6px 8px;text-align:left;font-size:11px;color:#64748B;background:#F8FAFC;border-bottom:2px solid #E2E8F0;position:sticky;left:0;z-index:2">Employé</th>${head}</tr></thead>
+    <tbody>${rows}<tr><td style="padding:6px 8px;font-size:11px;font-weight:800;color:#0369A1;background:#F0F9FF;border-top:2px solid #BAE6FD;position:sticky;left:0">Disponibles</td>${tot}</tr></tbody>
+  </table>`;
+}
+function openDispoTable(){
+  document.getElementById('modal-root').innerHTML=`
+    <div class="overlay" onclick="if(event.target===this)closeModal()" style="align-items:center;padding:10px">
+      <div class="modal" style="max-width:980px;border-radius:16px;max-height:94vh">
+        <div class="modal-hdr" style="border-radius:16px 16px 0 0">
+          <span>🗓️</span><span style="flex:1">Disponibilités · ${fWk(MON)}</span>
+          <button onclick="closeModal()" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:28px;height:28px;border-radius:50%;font-size:14px">✕</button>
+        </div>
+        <div style="padding:10px 12px">
+          <div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:8px">
+            <button class="btn-sec" onclick="dtWeek(-1)">‹</button>
+            <button class="btn-sec" onclick="goToday();openDispoTable()">Auj.</button>
+            <button class="btn-sec" onclick="dtWeek(1)">›</button>
+            <button class="btn-sec" style="margin-left:auto" onclick="printDispoTable()">🖨️ Imprimer</button>
+          </div>
+          ${S.emps.length?`<div style="overflow-x:auto;border:1px solid #E2E8F0;border-radius:10px">${buildDispoTable(false)}</div>`:'<div style="padding:30px;text-align:center;color:#94A3B8">Aucun employé</div>'}
+          <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:#64748B;margin-top:8px">
+            <span><b style="color:#15803D">■</b> Disponible</span><span><b style="color:#BE123C">■</b> Indispo</span>
+            <span><b style="color:#92400E">■</b> Dispos à compléter (considéré dispo)</span><span><b style="color:#155E75">■</b> Absence</span>
+            <span><b style="color:#64748B">■</b> Hors contrat</span><span><b style="color:#0369A1">📅</b> Créneau planifié (<b style="color:#DC2626">rouge</b> = hors dispo)</span>
+          </div>
+          <div style="font-size:10px;color:#94A3B8;margin-top:4px">Cliquez une case pour modifier les disponibilités de l'employé.</div>
+        </div>
+      </div>
+    </div>`;
+}
+function dtWeek(n){changeWeek(n);openDispoTable();}
+function printDispoTable(){
+  const html=`<div class="print-page"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #0EA5E9"><div style="font-size:26px">🫙</div><div><div style="font-size:12px;font-weight:700;color:#0EA5E9">LA MARMITE BLEUE</div><div style="font-size:17px;font-weight:800">Disponibilités de l'équipe</div><div style="font-size:12px;color:#64748B">${fWk(MON)}</div></div></div>${buildDispoTable(true)}</div>`;
+  closeModal();doPrint(html);openDispoTable();
+}
+
+// ═══════════════════════════════════
+// TRAMES DE PLANNING (v33)
+// ═══════════════════════════════════
+let _trameId=null,_trameMode='attribuer';
+function getTrames(){if(!Array.isArray(S.trames))S.trames=[];return S.trames;}
+function curTrame(){const ts=getTrames();return ts.find(t=>t.id===_trameId)||ts[0]||null;}
+function pidOr(id){return getPostes().find(p=>p.id===id)?id:getPostes()[0].id;}
+function newTrame(nom){
+  const sl=(p,s,e)=>({id:uid(),poste:pidOr(p),s,e});
+  const jours={};
+  DISPO_JOURS.forEach(j=>{jours[j.k]=[sl('Moule',690,900),sl('Salle',690,900),sl('Moule',1110,1380),sl('Salle',1110,1380)];});
+  return{id:uid(),nom:nom||'Trame type',jours};
+}
+function daySlots(tr,k){return (tr.jours[k]||[]).slice().sort((a,b)=>a.s-b.s||a.poste.localeCompare(b.poste));}
+function slotH(sl){return(sl.e-sl.s)/60;}
+function trameTotals(tr){let n=0,h=0;DISPO_JOURS.forEach(j=>{(tr.jours[j.k]||[]).forEach(sl=>{n++;h+=slotH(sl);});});return{n,h:Math.round(h*10)/10};}
+
+// Qui occupe chaque créneau de la trame ce jour-là (rapprochement avec le planning)
+function resolveDay(dk,slots){
+  const claimed=new Set(),res={};
+  slots.forEach(sl=>{
+    for(const e of S.emps){
+      const shs=shifts(dk,e.id);let found=-1;
+      shs.forEach((sh,i)=>{if(found<0&&!claimed.has(e.id+'|'+i)&&sh.s===sl.s&&sh.e===sl.e&&(sh.poste||mainP(e))===sl.poste)found=i;});
+      if(found>=0){claimed.add(e.id+'|'+found);res[sl.id]=e.id;break;}
+    }
+  });
+  return res;
+}
+function overlapShift(eid,dk,s,e,ignore){return shifts(dk,eid).some((sh,i)=>i!==ignore&&sh.s<e&&sh.e>s);}
+// Diagnostic d'un employé pour un créneau
+function candInfo(emp,dk,sl){
+  const pb=[];
+  if(absOn(emp.id,dk))pb.push('absent');
+  else if(!inContract(emp,dk))pb.push('hors contrat');
+  else if(!isAvail(emp,dk,sl.s,sl.e))pb.push('hors dispo');
+  if(overlapShift(emp.id,dk,sl.s,sl.e))pb.push('déjà en poste');
+  if(!(emp.postes||[]).includes(sl.poste))pb.push('pas sur ce poste');
+  const wh=Math.round(wkH(emp.id)*10)/10;
+  if(wh+slotH(sl)>emp.heures)pb.push('dépasse contrat');
+  return{ok:!pb.length,pb,wh};
+}
+
+function renderTrames(){
+  const el=document.getElementById('tab-trames');if(!el)return;
+  const ts=getTrames(),tr=curTrame();
+  if(tr)_trameId=tr.id;
+  const sel=ts.map(t=>`<option value="${t.id}" ${tr&&t.id===tr.id?'selected':''}>${t.nom}</option>`).join('');
+  let html=`<div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      <div><div style="font-size:17px;font-weight:800;color:#0F172A">📐 Trames de planning</div><div style="font-size:12px;color:#64748B">Préparez les créneaux de la semaine, puis attribuez-les aux salariés disponibles</div></div>
+    </div>
+    <div class="card" style="padding:10px 12px;margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      ${ts.length?`<select class="tag-select" style="width:auto;flex:1;min-width:140px" onchange="_trameId=this.value;renderTrames()">${sel}</select>`:'<span style="font-size:12px;color:#94A3B8;flex:1">Aucune trame</span>'}
+      <button class="btn-sec" onclick="addTrame()">＋ Nouvelle</button>
+      ${tr?`<button class="btn-sec" onclick="dupTrame()">⧉ Dupliquer</button><button class="btn-sec" onclick="renameTrame()">✏️</button><button class="btn-sec" style="color:#BE123C" onclick="delTrame()">🗑️</button>`:''}
+    </div>`;
+  if(!tr){el.innerHTML=html+`<div style="text-align:center;padding:40px;background:#fff;border-radius:12px;border:1px dashed #E2E8F0;color:#94A3B8"><div style="font-size:38px">📐</div><div style="font-weight:700;color:#374151;margin:6px 0">Aucune trame</div><button class="btn-pri" onclick="addTrame()">＋ Créer ma première trame</button></div>`;return;}
+  const tot=trameTotals(tr);
+  html+=`<div style="display:flex;gap:0;margin-bottom:10px;border-radius:10px;overflow:hidden;border:1px solid #BAE6FD">
+      <button onclick="_trameMode='attribuer';renderTrames()" style="flex:1;padding:9px;border:none;font-size:13px;font-weight:700;background:${_trameMode==='attribuer'?'#0EA5E9':'#fff'};color:${_trameMode==='attribuer'?'#fff':'#0369A1'}">👥 Attribuer</button>
+      <button onclick="_trameMode='modele';renderTrames()" style="flex:1;padding:9px;border:none;font-size:13px;font-weight:700;background:${_trameMode==='modele'?'#0EA5E9':'#fff'};color:${_trameMode==='modele'?'#fff':'#0369A1'}">✏️ Modifier la trame</button>
+    </div>
+    <div style="font-size:11px;color:#64748B;margin-bottom:8px">${tot.n} créneaux · ${tot.h} h sur la semaine</div>`;
+  html+=_trameMode==='modele'?buildTrameEditor(tr):buildTrameAssign(tr);
+  el.innerHTML=html;
+}
+
+// ── Édition de la trame ──
+function buildTrameEditor(tr){
+  const PS_=getPS();
+  return DISPO_JOURS.map(j=>{
+    const slots=(tr.jours[j.k]||[]).slice().sort((a,b)=>a.s-b.s||a.poste.localeCompare(b.poste));
+    const h=Math.round(slots.reduce((s,sl)=>s+slotH(sl),0)*10)/10;
+    return`<div class="card" style="padding:10px 12px;margin-bottom:8px">
+      <div class="row" style="gap:6px;margin-bottom:6px;flex-wrap:wrap">
+        <div style="font-weight:800;font-size:13px;color:${j.k==='sam'||j.k==='dim'?'#DC2626':'#0F172A'};flex:1">${j.l} <span style="font-size:11px;font-weight:500;color:#94A3B8">· ${slots.length} créneau${slots.length>1?'x':''} · ${h} h</span></div>
+        <button onclick="trAddSlot('${j.k}')" style="background:#F0FDF4;border:1px solid #86EFAC;color:#15803D;padding:4px 9px;border-radius:6px;font-size:11px;font-weight:700">＋ créneau</button>
+        <button onclick="trCopyDay('${j.k}')" style="background:#F0F9FF;border:1px solid #BAE6FD;color:#0369A1;padding:4px 9px;border-radius:6px;font-size:11px">📋 Copier vers…</button>
+      </div>
+      ${slots.length?slots.map(sl=>{const ps=PS_[sl.poste]||{};return`<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-top:1px solid #F1F5F9;flex-wrap:wrap">
+        <select onchange="trSet('${j.k}','${sl.id}','poste',this.value)" style="padding:6px;border-radius:7px;border:1.5px solid ${ps.bd||'#E2E8F0'};background:${ps.bg||'#fff'};color:${ps.tx||'#374151'};font-weight:700;font-size:12px">
+          ${getPostes().map(p=>`<option value="${p.id}" ${p.id===sl.poste?'selected':''}>${p.ico||''} ${p.id}</option>`).join('')}
+        </select>
+        <input type="time" step="900" value="${m2hhmm(sl.s)}" onchange="trSet('${j.k}','${sl.id}','s',this.value)" style="padding:5px;border:1px solid #E2E8F0;border-radius:7px;font-size:13px">
+        <span style="color:#94A3B8">→</span>
+        <input type="time" step="900" value="${m2hhmm(sl.e)}" onchange="trSet('${j.k}','${sl.id}','e',this.value)" style="padding:5px;border:1px solid #E2E8F0;border-radius:7px;font-size:13px">
+        <span style="font-size:11px;color:#64748B">${fDur(sl.e-sl.s)}</span>
+        <button onclick="trDelSlot('${j.k}','${sl.id}')" style="margin-left:auto;background:none;border:none;color:#BE123C;font-size:15px">✕</button>
+      </div>`;}).join(''):'<div style="font-size:12px;color:#94A3B8;padding:4px 0">Fermé / aucun créneau</div>'}
+    </div>`;
+  }).join('');
+}
+function trSave(){autoSave();renderTrames();}
+function addTrame(){const nom=prompt('Nom de la trame (ex : Semaine normale, Haute saison) :','Semaine normale');if(nom===null)return;const t=newTrame(nom.trim()||'Trame');getTrames().push(t);_trameId=t.id;_trameMode='modele';trSave();}
+function dupTrame(){const tr=curTrame();if(!tr)return;const c=JSON.parse(JSON.stringify(tr));c.id=uid();c.nom=tr.nom+' (copie)';DISPO_JOURS.forEach(j=>(c.jours[j.k]||[]).forEach(sl=>sl.id=uid()));getTrames().push(c);_trameId=c.id;trSave();}
+function renameTrame(){const tr=curTrame();if(!tr)return;const n=prompt('Nouveau nom :',tr.nom);if(n&&n.trim()){tr.nom=n.trim();trSave();}}
+function delTrame(){const tr=curTrame();if(!tr||!confirm(`Supprimer la trame « ${tr.nom} » ?\n(le planning déjà attribué n'est pas modifié)`))return;S.trames=getTrames().filter(t=>t.id!==tr.id);_trameId=null;trSave();}
+function trAddSlot(k){const tr=curTrame(),arr=tr.jours[k]=tr.jours[k]||[],last=arr[arr.length-1];arr.push({id:uid(),poste:last?last.poste:getPostes()[0].id,s:last?last.s:690,e:last?last.e:900});trSave();}
+function trDelSlot(k,id){const tr=curTrame();tr.jours[k]=(tr.jours[k]||[]).filter(sl=>sl.id!==id);trSave();}
+function trSet(k,id,f,v){
+  const sl=(curTrame().jours[k]||[]).find(x=>x.id===id);if(!sl)return;
+  if(f==='poste')sl.poste=v;else{const m=hhmm2m(v,f==='e');if(m==null)return;sl[f]=m;}
+  if(sl.e<=sl.s){alert("L'heure de fin doit être après l'heure de début.");}
+  trSave();
+}
+function trCopyDay(k){
+  const tr=curTrame(),src=tr.jours[k]||[];
+  const lbl=DISPO_JOURS.find(j=>j.k===k).l;
+  const r=prompt(`Copier les créneaux du ${lbl} vers quels jours ?\nTapez par ex. « mar mer jeu » ou « tous »`,'tous');
+  if(r===null)return;
+  const t=r.toLowerCase(),targets=DISPO_JOURS.filter(j=>j.k!==k&&(t.includes('tous')||t.includes(j.k)));
+  if(!targets.length){alert('Aucun jour reconnu (lun mar mer jeu ven sam dim).');return;}
+  targets.forEach(j=>{tr.jours[j.k]=src.map(sl=>({...sl,id:uid()}));});
+  trSave();
+}
+
+// ── Attribution aux salariés ──
+function buildTrameAssign(tr){
+  const PS_=getPS();
+  let filled=0,total=0;
+  const cards=days().map((d,i)=>{
+    const dk=iso(d),k=DISPO_JOURS[i].k;
+    const slots=daySlots(tr,k);
+    const res=resolveDay(dk,slots);
+    total+=slots.length;filled+=Object.keys(res).length;
+    return`<div class="card" style="padding:10px 12px;margin-bottom:8px">
+      <div style="font-weight:800;font-size:13px;color:${isWE(d)?'#DC2626':'#0F172A'};text-transform:capitalize;margin-bottom:4px">${d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'short'})}
+        <span style="font-size:11px;font-weight:600;color:${Object.keys(res).length===slots.length?'#16A34A':'#D97706'}"> · ${Object.keys(res).length}/${slots.length} attribués</span></div>
+      ${slots.length?slots.map(sl=>{
+        const ps=PS_[sl.poste]||{},cur=res[sl.id]||'',pc=getPostes().find(p=>p.id===sl.poste)||{};
+        const opts=S.emps.map(e=>({e,ci:candInfo(e,dk,sl)}))
+          .sort((a,b)=>(b.ci.ok-a.ci.ok)||(a.ci.pb.length-b.ci.pb.length)||(a.ci.wh/a.e.heures-b.ci.wh/b.e.heures));
+        const curEmp=S.emps.find(e=>e.id===cur);
+        return`<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-top:1px solid #F1F5F9;flex-wrap:wrap">
+          <span style="padding:3px 8px;border-radius:8px;background:${ps.bg||'#F8FAFC'};border:1px solid ${ps.bd||'#E2E8F0'};color:${ps.tx||'#374151'};font-size:11px;font-weight:700;min-width:80px">${pc.ico||''} ${sl.poste}</span>
+          <span style="font-size:12px;font-weight:700;color:#0F172A;min-width:84px">${fT(sl.s)}–${fT(sl.e)}</span>
+          <select onchange="assignSlot('${dk}','${k}','${sl.id}',this.value)" style="flex:1;min-width:160px;padding:7px;border-radius:8px;font-size:12px;border:1.5px solid ${cur?'#86EFAC':'#FCD34D'};background:${cur?'#F0FDF4':'#FFFBEB'};font-weight:${cur?700:400}">
+            <option value="">— À attribuer —</option>
+            ${opts.map(({e,ci})=>`<option value="${e.id}" ${e.id===cur?'selected':''}>${ci.ok||e.id===cur?'✅':'⚠️'} ${e.prenom} ${e.nom} · ${ci.wh}/${e.heures}h${e.id!==cur&&ci.pb.length?' · '+ci.pb.join(', '):''}</option>`).join('')}
+          </select>
+          ${curEmp&&!isAvail(curEmp,dk,sl.s,sl.e)?'<span title="Hors disponibilités" style="color:#DC2626">⚠️</span>':''}
+        </div>`;}).join(''):'<div style="font-size:12px;color:#94A3B8">Aucun créneau ce jour</div>'}
+    </div>`;
+  }).join('');
+  return`<div class="card" style="padding:10px 12px;margin-bottom:10px">
+      <div class="row" style="gap:6px;flex-wrap:wrap">
+        <button class="btn-sec" onclick="changeWeek(-1)">‹</button>
+        <div style="flex:1;text-align:center;font-weight:700;font-size:13px;min-width:120px">${fWk(MON)}</div>
+        <button class="btn-sec" onclick="changeWeek(1)">›</button>
+      </div>
+      <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">
+        <div style="flex:1;font-size:12px;font-weight:700;color:${filled===total?'#16A34A':'#D97706'}">${filled}/${total} créneaux attribués</div>
+        <button class="btn-pri" onclick="autoAssign()">⚡ Compléter auto</button>
+        <button class="btn-sec" style="color:#BE123C" onclick="clearAssign()">Retirer</button>
+      </div>
+      <div style="font-size:10px;color:#94A3B8;margin-top:6px;line-height:1.5">Liste triée : ✅ d'abord. « Compléter auto » ne remplit que les créneaux vides, avec un salarié <b>affecté à ce poste</b>, <b>disponible</b> sur toute la plage, <b>non absent</b>, <b>sous contrat</b>, <b>pas déjà en poste</b> à cette heure et <b>sans dépasser ses heures de contrat</b> — en priorité ceux qui ont le moins d'heures.</div>
+    </div>${cards}`;
+}
+function assignSlot(dk,k,slotId,eid){
+  const tr=curTrame(),sl=(tr.jours[k]||[]).find(x=>x.id===slotId);if(!sl)return;
+  const prev=resolveDay(dk,daySlots(tr,k))[slotId];
+  if(prev===eid)return;
+  if(eid){
+    const emp=S.emps.find(e=>e.id===eid),ci=candInfo(emp,dk,sl);
+    if(!ci.ok&&!confirm(`${emp.prenom} : ${ci.pb.join(', ')}.\nAttribuer quand même ?`)){renderTrames();return;}
+  }
+  if(prev){const arr=shifts(dk,prev),i=arr.findIndex(sh=>sh.s===sl.s&&sh.e===sl.e&&(sh.poste||mainP(S.emps.find(e=>e.id===prev)||{}))===sl.poste);if(i>=0){arr.splice(i,1);setShifts(dk,prev,arr);}}
+  if(eid)setShifts(dk,eid,[...shifts(dk,eid),{s:sl.s,e:sl.e,poste:sl.poste}]);
+  renderTrames();
+}
+function autoAssign(){
+  const tr=curTrame();if(!tr)return;
+  let done=0,left=0;
+  days().forEach((d,i)=>{
+    const dk=iso(d),k=DISPO_JOURS[i].k;
+    const slots=daySlots(tr,k);
+    const res=resolveDay(dk,slots);
+    slots.filter(sl=>!res[sl.id]).forEach(sl=>{
+      const c=S.emps.map(e=>({e,ci:candInfo(e,dk,sl)})).filter(x=>x.ci.ok).sort((a,b)=>a.ci.wh/a.e.heures-b.ci.wh/b.e.heures)[0];
+      if(c){setShifts(dk,c.e.id,[...shifts(dk,c.e.id),{s:sl.s,e:sl.e,poste:sl.poste}]);done++;}else left++;
+    });
+  });
+  renderTrames();
+  alert(`⚡ ${done} créneau(x) attribué(s).${left?`\n${left} créneau(x) sans salarié disponible : à attribuer à la main (liste ⚠️).`:''}`);
+}
+function clearAssign(){
+  const tr=curTrame();if(!tr||!confirm('Retirer du planning tous les salariés attribués aux créneaux de cette trame pour la semaine affichée ?'))return;
+  days().forEach((d,i)=>{
+    const dk=iso(d),k=DISPO_JOURS[i].k,slots=daySlots(tr,k),res=resolveDay(dk,slots);
+    slots.forEach(sl=>{const eid=res[sl.id];if(!eid)return;const arr=shifts(dk,eid),j=arr.findIndex(sh=>sh.s===sl.s&&sh.e===sl.e&&(sh.poste||mainP(S.emps.find(e=>e.id===eid)||{}))===sl.poste);if(j>=0){arr.splice(j,1);setShifts(dk,eid,arr);}});
+  });
+  renderTrames();
 }
 
 // ═══════════════════════════════════

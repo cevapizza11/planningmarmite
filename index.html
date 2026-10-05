@@ -121,7 +121,7 @@ button,input,select,textarea{font-family:inherit;cursor:pointer}
       <div style="font-size:9px;opacity:.7;letter-spacing:.8px">PLANIFICATION DU PERSONNEL</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
-      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.05/10/2026 16:45</div>
+      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.05/10/2026 17:45</div>
       <div id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:#FCD34D;transition:background .3s" title="Sync Firebase"></div>
     </div>
   </div>
@@ -1769,6 +1769,41 @@ async function generateContractWord(empId){
     console.error('Word generation error:',err);
     alert('Erreur lors de la génération Word : '+err.message);
   }
+}
+
+function saveIdentite(empId){
+  const prenom=(document.getElementById('rh-prenom').value||'').trim();
+  const nom=(document.getElementById('rh-nom').value||'').trim();
+  if(!prenom||!nom){alert('Prénom et Nom requis.');return;}
+  const phone=document.getElementById('rh-phone').value.trim();
+  const email=document.getElementById('rh-email').value.trim();
+  const address=document.getElementById('rh-address').value.trim();
+  const nir=cleanNIR(document.getElementById('rh-nir').value);
+  if(nir&&!nirValid(nir)){if(!confirm('Le n° de Sécurité Sociale semble incorrect (clé invalide). Enregistrer quand même ?'))return;}
+  const name=`${prenom} ${nom}`;
+  db.collection('employees').doc(empId).update({name})
+    .then(()=>PRIVREF.doc(empId).set({phone,email,address,nir},{merge:true}))
+    .then(()=>{closeModal();renderRH();})
+    .catch(e=>alert('Erreur: '+e.message));
+}
+
+function saveContrat(empId){
+  const contractType=document.getElementById('rh-ctype').value;
+  const contractHours=+document.getElementById('mh').value||35;
+  const grossSalary=+document.getElementById('rh-salary').value||null;
+  const csVal=document.getElementById('rh-cstart').value;
+  const ceVal=document.getElementById('rh-cend')?.value;
+  const trialVal=document.getElementById('rh-trial').value;
+  const contractTemplate=document.getElementById('rh-ctpl')?.value||'equipier';
+  const data={contractType,contractHours,contractTemplate,postes:[...mPostes]};
+
+  if(csVal)data.contractStart=firebase.firestore.Timestamp.fromDate(new Date(csVal));
+  if(ceVal&&contractType==='CDD')data.contractEnd=firebase.firestore.Timestamp.fromDate(new Date(ceVal));
+  if(trialVal)data.trialEndDate=firebase.firestore.Timestamp.fromDate(new Date(trialVal));
+  db.collection('employees').doc(empId).update(data)
+    .then(()=>PRIVREF.doc(empId).set({grossSalary:grossSalary||null},{merge:true}))
+    .then(()=>{closeModal();renderRH();})
+    .catch(e=>alert('Erreur: '+e.message));
 }
 
 // ═══════════════════════════════════

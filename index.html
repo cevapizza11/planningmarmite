@@ -121,7 +121,7 @@ button,input,select,textarea{font-family:inherit;cursor:pointer}
       <div style="font-size:9px;opacity:.7;letter-spacing:.8px">PLANIFICATION DU PERSONNEL</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
-      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.06/10/2026 00:50</div>
+      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.06/10/2026 09:30</div>
       <div id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:#FCD34D;transition:background .3s" title="Sync Firebase"></div>
     </div>
   </div>
@@ -993,7 +993,7 @@ function renderRH(){
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:3px">
           <span style="padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;background:${ctBg};color:${ctColor}">${ct}</span>
           <span style="font-size:11px;color:#64748B">${emp.heures}h/sem</span>
-          ${dispoCount===null?`<span style="padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;background:#FFFBEB;color:#92400E;border:1px solid #FCD34D">🗓️ Dispos à compléter</span>`:`<span style="font-size:11px;color:#64748B">📅 dispo ${dispoCount}j/7</span>`}
+          ${dispoCount===null?`<span style="padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;background:#FFFBEB;color:#92400E;border:1px solid #FCD34D">🗓️ Dispos à compléter</span>`:dispoGauge(dispoWeekMin(emp.dispoH),emp.heures,true)}
           ${emp.phone?`<span style="font-size:11px;color:#64748B">📞 ${emp.phone}</span>`:''}
         </div>
       </div>
@@ -1022,7 +1022,7 @@ function getCHRAlerts(){
       if(diff>0&&diff<=14) alerts.push({type:'info',ico:'📋',msg:`${emp.prenom} ${emp.nom} — Période d'essai se termine dans ${diff} jour${diff>1?'s':''}`});
     }
   });
-  return alerts.concat(getAbsAlerts(),getPlanAlerts(),getLegalAlerts());
+  return alerts.concat(getAbsAlerts(),getPlanAlerts(),getLegalAlerts(),getDispoAlerts());
 }
 
 function openFicheRH(empId){
@@ -1350,6 +1350,7 @@ function renderParams(){
       </div>`).join('')}
       <button id="spb" class="btn-pri" onclick="saveParams()" style="width:100%;padding:10px;font-size:14px;border-radius:9px;margin-top:4px">💾 Enregistrer</button>
     </div>
+    ${dispoRuleCard()}
     ${legalParamsCard()}
     <div class="card" style="padding:14px;margin-bottom:10px">
       <div style="font-size:15px;font-weight:800;color:#0F172A;margin-bottom:3px">🏷️ Gestion des postes</div>
@@ -1896,12 +1897,14 @@ function buildTabDispo(emp){
     _tmpDispoH={_emp:emp.id,_fromLegacy:!emp.dispoSet&&!!emp._dispoRaw};
     DISPO_JOURS.forEach(j=>{_tmpDispoH[j.k]=base?mergeRanges(base[j.k]):[{s:10*60,e:15*60},{s:18*60,e:23*60}];});
     _tmpDispoH._new=!base;
+    _tmpDispoH._heures=emp.heures;
   }
   return`<div class="rh-section">
     ${!emp.dispoSet?`<div class="alert-chr warn"><span>🗓️</span><span>${_tmpDispoH._fromLegacy?'Plages converties depuis l’ancienne grille Matin / Après-midi / Soir : vérifiez puis enregistrez.':'Disponibilités pas encore renseignées : pré-rempli 10h–15h et 18h–23h, à ajuster puis enregistrer.'} Tant que ce n’est pas enregistré, l’employé est considéré disponible partout.</span></div>`:''}
     <div class="rh-card">
       <div class="rh-card-title">Disponibilités habituelles</div>
       <div style="font-size:11px;color:#64748B;margin-bottom:10px">Indiquez les plages horaires où l'employé peut travailler. Jour sans plage = indisponible.</div>
+      <div id="dispo-gauge">${dispoGauge(dispoWeekMin(_tmpDispoH),emp.heures)}</div>
       <div id="dispo-days">${buildDispoDays()}</div>
       <button onclick="copyDispoLundi()" class="btn-sec" style="width:100%;margin-top:8px">📋 Copier le lundi sur tous les jours</button>
     </div>
@@ -1922,7 +1925,7 @@ function buildDispoDays(){
     const rs=_tmpDispoH[j.k]||[],we=j.k==='sam'||j.k==='dim';
     return`<div style="padding:8px 0;border-bottom:1px solid #F1F5F9">
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-        <div style="width:72px;font-size:12px;font-weight:700;color:${we?'#DC2626':'#374151'}">${j.l}</div>
+        <div style="width:72px;font-size:12px;font-weight:700;color:${we?'#DC2626':'#374151'}">${j.l}${rs.length?`<div style="font-size:10px;font-weight:700;color:#15803D">${fH(rangesMin(rs))}</div>`:''}</div>
         ${rs.length?'':`<span style="font-size:11px;font-weight:700;color:#BE123C;padding:3px 8px;border-radius:6px;background:#FFF1F2;border:1px solid #FECDD3">Indisponible</span>`}
         <div style="margin-left:auto;display:flex;gap:4px">
           <button onclick="dispoAdd('${j.k}')" style="background:#F0FDF4;border:1px solid #86EFAC;color:#15803D;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:700">+ plage</button>
@@ -1939,7 +1942,7 @@ function buildDispoDays(){
     </div>`;
   }).join('');
 }
-function refreshDispoDays(){const el=document.getElementById('dispo-days');if(el)el.innerHTML=buildDispoDays();}
+function refreshDispoDays(){const el=document.getElementById('dispo-days');if(el)el.innerHTML=buildDispoDays();const g=document.getElementById('dispo-gauge');if(g&&_tmpDispoH)g.innerHTML=dispoGauge(dispoWeekMin(_tmpDispoH),_tmpDispoH._heures||35);}
 function dispoAdd(k){
   const rs=_tmpDispoH[k],last=rs[rs.length-1];
   const s=last?Math.min(last.e+60,22*60):10*60;rs.push({s,e:Math.min(s+5*60,1440)});refreshDispoDays();
@@ -1947,7 +1950,7 @@ function dispoAdd(k){
 function dispoFull(k){_tmpDispoH[k]=[{s:TL_S,e:1440}];refreshDispoDays();}
 function dispoNone(k){_tmpDispoH[k]=[];refreshDispoDays();}
 function dispoDel(k,i){_tmpDispoH[k].splice(i,1);refreshDispoDays();}
-function dispoSet(k,i,f,v){const m=hhmm2m(v,f==='e');if(m==null)return;_tmpDispoH[k][i][f]=m;}
+function dispoSet(k,i,f,v){const m=hhmm2m(v,f==='e');if(m==null)return;_tmpDispoH[k][i][f]=m;refreshDispoDays();}
 function copyDispoLundi(){
   const src=_tmpDispoH.lun||[];
   DISPO_JOURS.forEach(j=>{if(j.k!=='lun')_tmpDispoH[j.k]=src.map(r=>({...r}));});refreshDispoDays();
@@ -1975,7 +1978,7 @@ function dispoCellInfo(emp,dk){
   if(!emp.dispoSet)return{bg:'#FFFBEB',bd:'#FCD34D',tx:'#92400E',txt:'? À compléter',dispo:true};
   const rs=dayRanges(emp,dk);
   if(!rs.length)return{bg:'#FFF1F2',bd:'#FECDD3',tx:'#BE123C',txt:'Indispo',dispo:false};
-  return{bg:'#F0FDF4',bd:'#86EFAC',tx:'#15803D',txt:rs.map(r=>fT(r.s)+'–'+(r.e>=1440?'24h':fT(r.e))).join('<br>'),dispo:true};
+  return{bg:'#F0FDF4',bd:'#86EFAC',tx:'#15803D',txt:rs.map(r=>fT(r.s)+'–'+(r.e>=1440?'24h':fT(r.e))).join('<br>')+`<div style="margin-top:2px;font-size:10px;font-weight:800;color:#166534;border-top:1px dashed #86EFAC;padding-top:2px">${fH(rangesMin(rs))}</div>`,dispo:true};
 }
 function buildDispoTable(forPrint){
   const ds=days();
@@ -1988,12 +1991,13 @@ function buildDispoTable(forPrint){
         <div style="border-radius:7px;padding:5px 4px;text-align:center;background:${c.bg};border:1px solid ${c.bd};color:${c.tx};font-size:11px;font-weight:700;line-height:1.35">${c.txt}</div>
         ${shs.length?`<div style="margin-top:2px;text-align:center;font-size:9px;font-weight:700;color:${shs.some(sh=>!isAvail(emp,dk,sh.s,sh.e))?'#DC2626':'#0369A1'}">📅 ${shs.map(sh=>fT(sh.s)+'–'+fT(sh.e)).join(' ')}</div>`:''}
       </td>`;}).join('')}
+    <td style="padding:4px 6px;border-bottom:1px solid #F1F5F9;text-align:center;white-space:nowrap">${emp.dispoSet?dispoGauge(dispoWeekMin(emp.dispoH),emp.heures,true):'<span style="font-size:10px;color:#92400E;font-weight:700">? À compléter</span>'}</td>
   </tr>`).join('');
   const tot=ds.map(d=>{const dk=iso(d),n=S.emps.filter(e=>dispoCellInfo(e,dk).dispo).length;
     return`<td style="padding:6px 4px;text-align:center;font-size:12px;font-weight:800;color:#0369A1;background:#F0F9FF;border-top:2px solid #BAE6FD">${n}</td>`;}).join('');
-  return`<table style="border-collapse:collapse;width:100%;min-width:${150+ds.length*88}px">
-    <thead><tr><th style="padding:6px 8px;text-align:left;font-size:11px;color:#64748B;background:#F8FAFC;border-bottom:2px solid #E2E8F0;position:sticky;left:0;z-index:2">Employé</th>${head}</tr></thead>
-    <tbody>${rows}<tr><td style="padding:6px 8px;font-size:11px;font-weight:800;color:#0369A1;background:#F0F9FF;border-top:2px solid #BAE6FD;position:sticky;left:0">Disponibles</td>${tot}</tr></tbody>
+  return`<table style="border-collapse:collapse;width:100%;min-width:${280+ds.length*88}px">
+    <thead><tr><th style="padding:6px 8px;text-align:left;font-size:11px;color:#64748B;background:#F8FAFC;border-bottom:2px solid #E2E8F0;position:sticky;left:0;z-index:2">Employé</th>${head}<th style="padding:6px 6px;font-size:11px;font-weight:700;color:#374151;background:#F8FAFC;border-bottom:2px solid #E2E8F0;min-width:120px">Total dispo / objectif<div style="font-size:9px;font-weight:500;color:#94A3B8">${String(DR()).replace('.',',')} × contrat</div></th></tr></thead>
+    <tbody>${rows}<tr><td style="padding:6px 8px;font-size:11px;font-weight:800;color:#0369A1;background:#F0F9FF;border-top:2px solid #BAE6FD;position:sticky;left:0">Disponibles</td>${tot}<td style="background:#F0F9FF;border-top:2px solid #BAE6FD"></td></tr></tbody>
   </table>`;
 }
 function openDispoTable(){
@@ -2464,6 +2468,64 @@ function pickTrameAndApply(){
 }
 
 // ═══════════════════════════════════
+// HEURES DE DISPONIBILITÉ vs CONTRAT (v36)
+// ═══════════════════════════════════
+function DR(){const v=parseFloat(S.par.dispoRatio);return isNaN(v)||v<=0?2:v;}
+function rangesMin(rs){return mergeRanges(rs).reduce((s,r)=>s+r.e-r.s,0);}
+function dispoWeekMin(dH){return dH?DISPO_JOURS.reduce((s,j)=>s+rangesMin(dH[j.k]),0):0;}
+function fH(m){const h=Math.round(m/6)/10;return(h%1?h.toFixed(1).replace('.',','):h)+' h';}
+// Jauge : heures dispo / objectif (contrat × ratio)
+function dispoGauge(min,heures,compact){
+  const obj=heures*DR()*60,pct=obj?Math.min(100,Math.round(min/obj*100)):100;
+  const col=min>=obj?'#16A34A':min>=heures*60?'#D97706':'#DC2626';
+  const bg=min>=obj?'#F0FDF4':min>=heures*60?'#FFFBEB':'#FFF1F2';
+  const lbl=min>=obj?'✅ Objectif atteint':min>=heures*60?`⚠️ Il manque ${fH(obj-min)}`:`⛔ Moins que le contrat`;
+  if(compact)return`<span title="Disponibilités ${fH(min)} / objectif ${fH(obj)} (${heures} h × ${String(DR()).replace('.',',')})" style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;background:${bg};color:${col};border:1px solid ${col}55">
+    <span style="display:inline-block;width:38px;height:5px;border-radius:3px;background:#E2E8F0;overflow:hidden"><span style="display:block;height:100%;width:${pct}%;background:${col}"></span></span>${fH(min)} / ${fH(obj)}</span>`;
+  return`<div style="padding:10px 12px;border-radius:10px;background:${bg};border:1.5px solid ${col}55;margin-bottom:10px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap">
+      <div style="font-size:12px;font-weight:700;color:#374151">Disponibilités sur la semaine</div>
+      <div style="font-size:16px;font-weight:800;color:${col}">${fH(min)} <span style="font-size:12px;font-weight:600;color:#64748B">/ ${fH(obj)}</span></div>
+    </div>
+    <div style="height:9px;border-radius:5px;background:#E2E8F0;overflow:hidden;margin:6px 0;position:relative">
+      <div style="height:100%;width:${pct}%;background:${col};border-radius:5px"></div>
+      <div title="Heures du contrat" style="position:absolute;top:-2px;bottom:-2px;left:${Math.min(100,100/DR())}%;width:2px;background:#0F172A"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:#64748B;gap:6px;flex-wrap:wrap">
+      <span>Contrat ${heures} h · objectif ${String(DR()).replace('.',',')} × contrat = ${fH(obj)}</span><span style="font-weight:700;color:${col}">${lbl}</span>
+    </div>
+  </div>`;
+}
+function getDispoAlerts(){
+  const out=[];
+  S.emps.forEach(e=>{
+    if(!e.dispoSet)return;
+    const m=dispoWeekMin(e.dispoH),obj=e.heures*DR()*60;
+    if(m<e.heures*60)out.push({type:'warn',ico:'🗓️',msg:`${e.prenom} ${e.nom} — ${fH(m)} de disponibilités pour un contrat de ${e.heures} h : impossible de remplir son contrat`});
+    else if(m<obj)out.push({type:'info',ico:'🗓️',msg:`${e.prenom} ${e.nom} — ${fH(m)} de disponibilités, objectif ${fH(obj)} (${String(DR()).replace('.',',')} × ${e.heures} h)`});
+  });
+  return out;
+}
+function dispoRuleCard(){
+  return`<div class="card" style="padding:16px;margin-bottom:10px">
+    <div style="font-size:15px;font-weight:800;color:#0F172A;margin-bottom:3px">🗓️ Règle interne : disponibilités</div>
+    <div style="font-size:11px;color:#94A3B8;margin-bottom:10px">Règle de gestion du restaurant (pas une obligation du Code du travail). Sert à avoir assez de souplesse pour construire le planning.</div>
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;border:1px solid #F1F5F9;background:#FAFAFA;margin-bottom:8px">
+      <div style="flex:1"><div style="font-size:12px;font-weight:500;color:#374151">Disponibilités demandées</div><div style="font-size:10px;color:#94A3B8">× les heures du contrat (ex : 2 → 70 h pour un 35 h)</div></div>
+      <input type="number" step="0.1" min="1" value="${DR()}" id="dr-ratio" style="width:66px;padding:5px 7px;border:1px solid #E2E8F0;border-radius:7px;font-size:14px;font-weight:700;text-align:center;outline:none">
+    </div>
+    <div style="font-size:11px;color:#374151;line-height:1.7;background:#F8FAFC;border-radius:8px;padding:8px 10px;margin-bottom:8px">
+      🟢 dispo ≥ ${String(DR()).replace('.',',')} × contrat · 🟠 entre 1 × et ${String(DR()).replace('.',',')} × (alerte info) · 🔴 moins que le contrat (alerte)
+    </div>
+    <button id="dr-save" class="btn-pri" onclick="saveDispoRule()" style="width:100%;padding:10px;font-size:14px;border-radius:9px">💾 Enregistrer</button>
+  </div>`;
+}
+function saveDispoRule(){
+  const v=parseFloat(String(document.getElementById('dr-ratio').value).replace(',','.'));
+  S.par.dispoRatio=isNaN(v)||v<1?2:v;autoSave();renderParams();
+}
+
+// ═══════════════════════════════════
 // MODULE ABSENCES (v29)
 // ═══════════════════════════════════
 const ABS_TYPES=[
@@ -2575,6 +2637,7 @@ function rulesCard(){
       • <b>Visite de reprise</b> : après un arrêt maladie ≥ 60 jours ou un accident du travail ≥ 30 jours (à faire dans les 8 jours suivant le retour) — alerte de 14 jours avant à 8 jours après le retour<br>
       • <b>Congés payés</b> : solde négatif (2,5 jours ouvrables acquis par mois, 30 j max, période du 1er juin au 31 mai)<br>
       • <b>Absence injustifiée</b> : à régulariser une fois terminée<br>
+      • <b>Disponibilités (règle interne)</b> : objectif ${String(DR()).replace('.',',')} × les heures du contrat par semaine — alerte si en dessous, alerte forte si moins que le contrat<br>
       <div style="margin-top:6px;font-weight:700">⚖️ Règles légales (seuils modifiables dans Paramètres) :</div>${legalRulesHtml()}
     </div>
     <div style="font-size:10px;color:#94A3B8;margin-top:6px">CP décomptés en jours ouvrables (lundi → samedi, hors jours fériés). Le compteur est une estimation : à rapprocher de la fiche de paie.</div>
@@ -2586,7 +2649,7 @@ function renderAbsences(){
   const ds=days(),today=todayIso(),j90=iso(addD(new Date(),-90));
   const list=ABS.filter(a=>!_absFilter||a.empId===_absFilter).sort((a,b)=>a.start<b.start?-1:1);
   const enCours=list.filter(a=>a.end>=today),passees=list.filter(a=>a.end<today&&a.end>=j90).reverse();
-  const alerts=getAbsAlerts().concat(getPlanAlerts(),getLegalAlerts());
+  const alerts=getAbsAlerts().concat(getPlanAlerts(),getLegalAlerts(),getDispoAlerts());
   const empOpts=S.emps.map(e=>`<option value="${e.id}" ${_absFilter===e.id?'selected':''}>${e.prenom} ${e.nom}</option>`).join('');
   const absRow=a=>{
     const emp=S.emps.find(e=>e.id===a.empId),t=absType(a.type);

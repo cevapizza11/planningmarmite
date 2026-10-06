@@ -121,7 +121,7 @@ button,input,select,textarea{font-family:inherit;cursor:pointer}
       <div style="font-size:9px;opacity:.7;letter-spacing:.8px">PLANIFICATION DU PERSONNEL</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
-      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.05/10/2026 19:15</div>
+      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.06/10/2026 00:50</div>
       <div id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:#FCD34D;transition:background .3s" title="Sync Firebase"></div>
     </div>
   </div>
@@ -230,7 +230,8 @@ let S={
   emps:[],templates:{},fc:{},plan:{},
   par:{ratioMoule:80,ratioFrite:100,ratioSalle:80,seuilBar:1500,seuilPlo:50,ticketMoyen:25},
   postesConfig:[...DEFAULT_POSTES],
-  trames:[]
+  trames:[],
+  open:{}
 };
 let MON=monday(new Date()),SEL=iso(new Date()),curTab='planning';
 let saveT=null,DRAG=null,_unsub=null,_unsubEmps=null,_unsubTemplates=null,_rhEmpTab='identite';
@@ -368,6 +369,7 @@ function applyData(d){
   if(d.par)S.par={...S.par,...d.par};
   if(d.postesConfig&&d.postesConfig.length)S.postesConfig=d.postesConfig;
   if(Array.isArray(d.trames))S.trames=d.trames;
+  if(d.open&&typeof d.open==='object')S.open=d.open;
   if(d.plan){
     const np={};
     for(const dk in d.plan){np[dk]={};for(const eid in d.plan[dk]){const v=d.plan[dk][eid];np[dk][eid]=Array.isArray(v)?v:(v&&v.s!=null?[v]:[]);}}
@@ -696,7 +698,7 @@ function renderPlanning(){
   const pills=ds.map(d=>{const dk=iso(d),sel=dk===SEL,we=isWE(d),tot=S.emps.reduce((s,e)=>s+dayMin(dk,e.id),0);
     return`<button class="pill${sel?' active':''}${!sel&&we?' we':''}" onclick="selDay('${dk}')">
       <span style="text-transform:capitalize">${fDay(d)}</span>
-      <span style="font-size:9px;display:block;margin-top:1px;opacity:${sel?.9:.6}">${tot?fDur(tot):'—'}</span>
+      <span style="font-size:9px;display:block;margin-top:1px;opacity:${sel?.9:.6}">${tot?fDur(tot):'—'}</span>${openSlots(dk).length?`<span style="font-size:9px;display:block;font-weight:800;color:${sel?'#FEF3C7':'#D97706'}">🟨 ${openSlots(dk).length}</span>`:''}
     </button>`;}).join('');
   document.getElementById('tab-planning').innerHTML=`
     <div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:8px">
@@ -705,6 +707,8 @@ function renderPlanning(){
       <button class="btn-sec" onclick="changeWeek(1)" style="font-size:17px;padding:6px 10px">›</button>
       <button class="btn-sec" onclick="goToday()" style="font-size:11px">Auj.</button>
       <button class="btn-sec" onclick="openDispoTable()" style="font-size:12px">🗓️ Dispos</button>
+      <button class="btn-sec" onclick="pickTrameAndApply()" style="font-size:12px;border-color:#FCD34D;color:#92400E">📥 Trame</button>
+      ${weekOpenCount()?`<button class="btn-pri" onclick="autoFillOpen()" style="background:linear-gradient(135deg,#F59E0B,#D97706)">⚡ Pourvoir auto (${weekOpenCount()})</button>`:''}
       <button class="btn-pri" onclick="autoGen()">⚡ Générer</button>
     </div>
     <div class="pills" style="margin-bottom:8px">${pills}</div>
@@ -784,6 +788,7 @@ function buildTimeline(dk){
       });
     });
   }
+  rows=buildOpenRows(dk)+rows;
   return`<div class="tl-outer">
     <div id="tl-top" style="overflow-x:auto;overflow-y:hidden;height:14px;border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:20;background:#F8FAFC" onscroll="syncScroll('top')">
       <div style="width:${EC_W+TL_W}px;height:1px"></div>
@@ -2083,12 +2088,9 @@ function renderTrames(){
     </div>`;
   if(!tr){el.innerHTML=html+`<div style="text-align:center;padding:40px;background:#fff;border-radius:12px;border:1px dashed #E2E8F0;color:#94A3B8"><div style="font-size:38px">📐</div><div style="font-weight:700;color:#374151;margin:6px 0">Aucune trame</div><button class="btn-pri" onclick="addTrame()">＋ Créer ma première trame</button></div>`;return;}
   const tot=trameTotals(tr);
-  html+=`<div style="display:flex;gap:0;margin-bottom:10px;border-radius:10px;overflow:hidden;border:1px solid #BAE6FD">
-      <button onclick="_trameMode='attribuer';renderTrames()" style="flex:1;padding:9px;border:none;font-size:13px;font-weight:700;background:${_trameMode==='attribuer'?'#0EA5E9':'#fff'};color:${_trameMode==='attribuer'?'#fff':'#0369A1'}">👥 Attribuer</button>
-      <button onclick="_trameMode='modele';renderTrames()" style="flex:1;padding:9px;border:none;font-size:13px;font-weight:700;background:${_trameMode==='modele'?'#0EA5E9':'#fff'};color:${_trameMode==='modele'?'#fff':'#0369A1'}">✏️ Modifier la trame</button>
-    </div>
-    <div style="font-size:11px;color:#64748B;margin-bottom:8px">${tot.n} créneaux · ${tot.h} h sur la semaine</div>`;
-  html+=_trameMode==='modele'?buildTrameEditor(tr):buildTrameAssign(tr);
+  html+=buildTrameApply(tr);
+  html+=`<div style="font-size:13px;font-weight:800;color:#0F172A;margin:4px 0 6px">✏️ Contenu de la trame <span style="font-size:11px;font-weight:500;color:#64748B">· ${tot.n} créneaux · ${tot.h} h sur la semaine</span></div>`;
+  html+=buildTrameEditor(tr);
   el.innerHTML=html;
 }
 
@@ -2319,6 +2321,146 @@ function saveLegal(){
   Object.keys(LG_DEF).forEach(k=>{const el=document.getElementById('lg-'+k);if(!el)return;if(k==='lgMode'){S.par[k]=el.value;return;}const n=parseFloat(String(el.value).replace(',','.'));S.par[k]=isNaN(n)||n<0?LG_DEF[k]:n;});
   autoSave();renderParams();
   const b=document.getElementById('lg-save');if(b){b.textContent='✓ Enregistré';b.style.background='#16A34A';}
+}
+
+// ═══════════════════════════════════
+// CRÉNEAUX À POURVOIR (v35) — la trame posée dans le planning
+// ═══════════════════════════════════
+function openSlots(dk){if(!S.open||typeof S.open!=='object')S.open={};return S.open[dk]||[];}
+function setOpen(dk,arr){if(!S.open)S.open={};S.open[dk]=arr;autoSave();}
+function weekOpenCount(){return days().reduce((n,d)=>n+openSlots(iso(d)).length,0);}
+
+// Pose la trame dans le planning de la semaine affichée
+function applyTrameToWeek(){
+  const tr=curTrame();if(!tr){alert('Aucune trame.');return;}
+  const n=weekOpenCount();
+  if(n&&!confirm(`Il reste déjà ${n} créneau(x) à pourvoir cette semaine.\nLes remplacer par la trame « ${tr.nom} » ?`))return;
+  let added=0,skipped=0;
+  days().forEach((d,i)=>{
+    const dk=iso(d),k=DISPO_JOURS[i].k,out=[];
+    daySlots(tr,k).forEach(sl=>{
+      // déjà tenu par un équipier (même poste, mêmes horaires) → pas de doublon
+      const held=S.emps.some(e=>shifts(dk,e.id).some(sh=>sh.s===sl.s&&sh.e===sl.e&&(sh.poste||mainP(e))===sl.poste));
+      if(held){skipped++;return;}
+      out.push({id:uid(),poste:sl.poste,s:sl.s,e:sl.e});added++;
+    });
+    S.open[dk]=out;
+  });
+  autoSave();
+  alert(`📥 Trame « ${tr.nom} » posée dans le planning du ${fWk(MON)} :\n${added} créneau(x) à pourvoir${skipped?`\n${skipped} déjà tenu(s) par un équipier`:''}\n\nAllez dans 📅 Planning : cliquez un créneau jaune pour choisir l'équipier, ou ⚡ Pourvoir auto.`);
+  curTab==='trames'?renderTrames():renderPlanning();
+}
+function clearWeekOpen(){
+  const n=weekOpenCount();if(!n)return;
+  if(!confirm(`Supprimer les ${n} créneau(x) à pourvoir de la semaine ?`))return;
+  days().forEach(d=>{S.open[iso(d)]=[];});autoSave();refreshTab();
+}
+
+// Ligne « À pourvoir » en haut du Gantt
+function laneOf(arr){const lanes=[];arr.slice().sort((a,b)=>a.s-b.s).forEach(o=>{let l=lanes.findIndex(L=>L.every(x=>x.e<=o.s||x.s>=o.e));if(l<0){lanes.push([]);l=lanes.length-1;}lanes[l].push(o);o._lane=l;});return lanes.length;}
+function buildOpenRows(dk){
+  const arr=openSlots(dk).map(o=>({...o}));
+  if(!arr.length)return'';
+  const nl=laneOf(arr),rh=rowH(nl),PS_=getPS();
+  const blocks=arr.map(o=>{const ps=PS_[o.poste]||{},pc=getPostes().find(p=>p.id===o.poste)||{},w=m2px(o.e)-m2px(o.s);
+    return`<div onclick="openAssignPicker('${dk}','${o.id}')" title="Cliquer pour attribuer" style="position:absolute;left:${m2px(o.s)}px;width:${w}px;top:${bTop(o._lane)}px;height:${BH}px;border:2px dashed #F59E0B;background:repeating-linear-gradient(135deg,#FFFBEB 0,#FFFBEB 8px,#FEF3C7 8px,#FEF3C7 16px);border-radius:8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2;overflow:visible">
+      <span style="font-size:10px;font-weight:800;color:#92400E;white-space:nowrap">${fT(o.s)}–${fT(o.e)}</span>
+      <span style="padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700;background:${ps.bd||'#FDE68A'};color:${ps.tx||'#92400E'};white-space:nowrap">${pc.ico||''} ${o.poste}</span>
+      <button onclick="event.stopPropagation();delOpen('${dk}','${o.id}')" style="position:absolute;top:-7px;right:-7px;width:17px;height:17px;border-radius:50%;border:1.5px solid #F59E0B;background:#fff;color:#BE123C;font-size:11px;display:flex;align-items:center;justify-content:center;padding:0">×</button>
+    </div>`;}).join('');
+  return`<div class="sec-hdr" style="border-color:#FCD34D">
+      <div class="sec-lbl" style="width:${EC_W}px;color:#92400E;border-color:#FCD34D;background:#FFFBEB">🟨 À pourvoir</div>
+      <div style="flex:1;background:#FFFBEB"></div>
+    </div>
+    <div style="display:flex;height:${rh}px;border-bottom:2px solid #FCD34D">
+      <div style="width:${EC_W}px;flex-shrink:0;height:${rh}px;padding:6px 8px;position:sticky;left:0;background:#FFFBEB;z-index:5;border-right:1px solid #FDE68A;display:flex;flex-direction:column;justify-content:center;gap:4px">
+        <div style="font-size:12px;font-weight:800;color:#92400E">${arr.length} créneau${arr.length>1?'x':''}</div>
+        <button onclick="autoFillOpen('${dk}')" style="background:#F59E0B;color:#fff;border:none;border-radius:7px;padding:4px 6px;font-size:10px;font-weight:700">⚡ Ce jour</button>
+      </div>
+      <div style="position:relative;width:${TL_W}px;height:${rh}px;flex-shrink:0;background:#FFFDF5">${blocks}</div>
+    </div>`;
+}
+function delOpen(dk,id){setOpen(dk,openSlots(dk).filter(o=>o.id!==id));renderPlanning();}
+
+// Choix de l'équipier pour un créneau à pourvoir
+function openAssignPicker(dk,id){
+  const o=openSlots(dk).find(x=>x.id===id);if(!o)return;
+  const PS_=getPS(),ps=PS_[o.poste]||{},pc=getPostes().find(p=>p.id===o.poste)||{};
+  const list=S.emps.map(e=>({e,ci:candInfo(e,dk,o)})).sort((a,b)=>(b.ci.ok-a.ci.ok)||(a.ci.pb.length-b.ci.pb.length)||(a.ci.wh/a.e.heures-b.ci.wh/b.e.heures));
+  const dLbl=new Date(dk+'T12:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+  document.getElementById('modal-root').innerHTML=`
+    <div class="overlay" onclick="if(event.target===this)closeModal()">
+      <div class="modal">
+        <div class="modal-hdr"><span>👤</span><span style="flex:1">Qui prend ce créneau ?</span></div>
+        <div class="modal-body">
+          <div style="padding:10px 12px;border-radius:10px;background:${ps.bg||'#F8FAFC'};border:1.5px solid ${ps.bd||'#E2E8F0'}">
+            <div style="font-size:14px;font-weight:800;color:${ps.tx||'#0F172A'}">${pc.ico||''} ${o.poste} · ${fT(o.s)}–${fT(o.e)}</div>
+            <div style="font-size:12px;color:#64748B;text-transform:capitalize">${dLbl} · ${fDur(o.e-o.s)}</div>
+          </div>
+          ${S.emps.length?list.map(({e,ci})=>`<button onclick="assignOpen('${dk}','${o.id}','${e.id}')" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 12px;border-radius:10px;border:1.5px solid ${ci.ok?'#86EFAC':'#E2E8F0'};background:${ci.ok?'#F0FDF4':'#fff'}">
+              <span style="font-size:16px">${ci.ok?'✅':'⚠️'}</span>
+              <span style="flex:1;min-width:0"><span style="display:block;font-size:13px;font-weight:700;color:#0F172A">${e.prenom} ${e.nom}</span>
+                <span style="display:block;font-size:11px;color:${ci.ok?'#15803D':'#B45309'}">${ci.wh}/${e.heures}h cette semaine${ci.pb.length?' · '+ci.pb.join(', '):''}</span></span>
+            </button>`).join(''):'<div style="color:#94A3B8">Aucun employé</div>'}
+        </div>
+        <div class="modal-foot">
+          <button onclick="closeModal();delOpen('${dk}','${o.id}')" class="btn-sec" style="color:#BE123C;margin-right:auto">🗑️ Supprimer le créneau</button>
+          <button onclick="closeModal()" class="btn-sec">Fermer</button>
+        </div>
+      </div>
+    </div>`;
+}
+function assignOpen(dk,id,eid){
+  const o=openSlots(dk).find(x=>x.id===id),emp=S.emps.find(e=>e.id===eid);if(!o||!emp)return;
+  if(overlapShift(eid,dk,o.s,o.e)){alert(`${emp.prenom} travaille déjà sur ce créneau horaire : impossible d'être à deux postes en même temps.`);return;}
+  const arr=[...shifts(dk,eid),{s:o.s,e:o.e,poste:o.poste}];
+  if(!legalGuard(eid,dk,arr))return;
+  const other=candInfo(emp,dk,o).pb.filter(x=>!x.startsWith('⚖️'));
+  if(other.length&&!confirm(`${emp.prenom} : ${other.join(', ')}.\nAttribuer quand même ?`))return;
+  setShifts(dk,eid,arr);
+  setOpen(dk,openSlots(dk).filter(x=>x.id!==id));
+  closeModal();renderPlanning();
+}
+// Remplissage automatique (un jour, ou toute la semaine)
+function autoFillOpen(onlyDk){
+  let done=0,left=0;
+  const dks=onlyDk?[onlyDk]:days().map(iso);
+  dks.forEach(dk=>{
+    const rest=[];
+    openSlots(dk).slice().sort((a,b)=>a.s-b.s).forEach(o=>{
+      const c=S.emps.map(e=>({e,ci:candInfo(e,dk,o)})).filter(x=>x.ci.ok).sort((a,b)=>a.ci.wh/a.e.heures-b.ci.wh/b.e.heures)[0];
+      if(c){setShifts(dk,c.e.id,[...shifts(dk,c.e.id),{s:o.s,e:o.e,poste:o.poste}]);done++;}else{rest.push(o);left++;}
+    });
+    S.open[dk]=rest;
+  });
+  autoSave();renderPlanning();
+  alert(`⚡ ${done} créneau(x) attribué(s).${left?`\n${left} restent en jaune : aucun équipier disponible, qualifié et dans les règles — à choisir à la main.`:''}`);
+}
+
+// Panneau « Poser dans le planning » de l'onglet Trames
+function buildTrameApply(tr){
+  const n=weekOpenCount();
+  return`<div class="card" style="padding:12px;margin-bottom:10px;border:2px solid #FCD34D;background:#FFFDF5">
+    <div style="font-size:13px;font-weight:800;color:#92400E;margin-bottom:8px">📥 Mettre la trame dans le planning</div>
+    <div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      <button class="btn-sec" onclick="changeWeek(-1)">‹</button>
+      <div style="flex:1;text-align:center;font-weight:700;font-size:13px;min-width:120px">${fWk(MON)}</div>
+      <button class="btn-sec" onclick="changeWeek(1)">›</button>
+    </div>
+    <button class="btn-pri" onclick="applyTrameToWeek()" style="width:100%;padding:11px;font-size:14px;background:linear-gradient(135deg,#F59E0B,#D97706);box-shadow:0 2px 8px rgba(245,158,11,.35)">📥 Poser « ${tr.nom} » sur cette semaine</button>
+    ${n?`<div class="row" style="gap:6px;margin-top:8px"><div style="flex:1;font-size:12px;color:#92400E;font-weight:600">🟨 ${n} créneau(x) encore à pourvoir cette semaine</div><button class="btn-sec" onclick="showTab('planning')">Voir le planning</button><button class="btn-sec" style="color:#BE123C" onclick="clearWeekOpen()">Vider</button></div>`:''}
+    <div style="font-size:10px;color:#94A3B8;margin-top:8px;line-height:1.5">Les créneaux arrivent en <b>jaune « À pourvoir »</b> en haut du Planning. Cliquez-en un pour choisir l'équipier (✅ dispo, qualifié, dans les règles légales), ou utilisez <b>⚡ Pourvoir auto</b>. Les créneaux déjà tenus par un équipier (même poste, mêmes horaires) ne sont pas recréés.</div>
+  </div>`;
+}
+
+function pickTrameAndApply(){
+  const ts=getTrames();
+  if(!ts.length){if(confirm("Aucune trame. Aller dans l'onglet Trames pour en créer une ?"))showTab('trames');return;}
+  if(ts.length===1){_trameId=ts[0].id;applyTrameToWeek();return;}
+  document.getElementById('modal-root').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="modal">
+    <div class="modal-hdr"><span>📥</span><span>Quelle trame poser sur ${fWk(MON)} ?</span></div>
+    <div class="modal-body">${ts.map(t=>{const tt=trameTotals(t);return`<button onclick="_trameId='${t.id}';closeModal();applyTrameToWeek()" style="text-align:left;padding:11px 12px;border-radius:10px;border:1.5px solid #FCD34D;background:#FFFBEB"><div style="font-weight:800;font-size:14px;color:#92400E">${t.nom}</div><div style="font-size:11px;color:#64748B">${tt.n} créneaux · ${tt.h} h</div></button>`;}).join('')}</div>
+    <div class="modal-foot"><button class="btn-sec" onclick="closeModal()">Annuler</button></div></div></div>`;
 }
 
 // ═══════════════════════════════════

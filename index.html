@@ -121,7 +121,7 @@ button,input,select,textarea{font-family:inherit;cursor:pointer}
       <div style="font-size:9px;opacity:.7;letter-spacing:.8px">PLANIFICATION DU PERSONNEL</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
-      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.06/10/2026 09:50</div>
+      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.06/10/2026 21:45</div>
       <div id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:#FCD34D;transition:background .3s" title="Sync Firebase"></div>
     </div>
   </div>
@@ -220,8 +220,26 @@ function getPS(){
 // ═══════════════════════════════════
 // CONSTANTES TIMELINE
 // ═══════════════════════════════════
-const PX=2,TL_S=6*60,TL_E=24*60,SNAP=15,MIN_D=120;
-const TL_W=(TL_E-TL_S)*PX,EC_W=130,BH=46,BG=6;
+let PX=2;const TL_S=6*60,TL_E=24*60,SNAP=15,MIN_D=120;
+let TL_W=(TL_E-TL_S)*PX,BH=46;const EC_W=130,BG=6;
+// Zoom du planning : 'fit' = journée entière à l'écran, 'detail' = grand format
+let ZOOM=(()=>{try{return localStorage.getItem('pl-zoom')||'fit';}catch(e){return'fit';}})();
+function applyZoom(){
+  if(ZOOM==='fit'){
+    const m=document.getElementById('tl-main'),c=document.getElementById('tab-planning');
+    const W=(m&&m.clientWidth?m.clientWidth:(c&&c.clientWidth?c.clientWidth-26:window.innerWidth-50))-EC_W-2;
+    PX=Math.max(0.8,Math.min(2,W/(TL_E-TL_S)));BH=38;
+  }else{PX=2;BH=46;}
+  TL_W=Math.round((TL_E-TL_S)*PX);
+}
+function toggleZoom(){ZOOM=ZOOM==='fit'?'detail':'fit';try{localStorage.setItem('pl-zoom',ZOOM);}catch(e){}renderPlanning();}
+let _rzT=null;window.addEventListener('resize',()=>{clearTimeout(_rzT);_rzT=setTimeout(()=>{if(curTab==='planning'&&ZOOM==='fit'&&!DRAG)renderPlanning();},200);});
+// Créneaux qui ne se chevauchent pas → même ligne
+function shiftLanes(shs){
+  const order=shs.map((_,i)=>i).sort((a,b)=>shs[a].s-shs[b].s),ends=[],lane=[];
+  order.forEach(i=>{let l=ends.findIndex(e=>e<=shs[i].s);if(l<0){l=ends.length;ends.push(0);}ends[l]=shs[i].e;lane[i]=l;});
+  return{lane,n:Math.max(1,ends.length)};
+}
 
 // ═══════════════════════════════════
 // STATE
@@ -715,6 +733,7 @@ function pUp(e){
 // RENDER PLANNING
 // ═══════════════════════════════════
 function renderPlanning(){
+  applyZoom();
   const scrollMain=document.getElementById('tl-main'),savedScroll=scrollMain?scrollMain.scrollLeft:0;
   const ds=days(),f=S.fc[SEL]||{},t=getTrans(f);
   const pills=ds.map(d=>{const dk=iso(d),sel=dk===SEL,we=isWE(d),tot=S.emps.reduce((s,e)=>s+dayMin(dk,e.id),0);
@@ -728,6 +747,7 @@ function renderPlanning(){
       <div style="flex:1;text-align:center;min-width:110px"><div style="font-weight:700;font-size:13px;color:#0F172A">${fWk(MON)}</div></div>
       <button class="btn-sec" onclick="changeWeek(1)" style="font-size:17px;padding:6px 10px">›</button>
       <button class="btn-sec" onclick="goToday()" style="font-size:11px">Auj.</button>
+      <button class="btn-sec" onclick="toggleZoom()" style="font-size:12px" title="Changer la taille du planning">${ZOOM==='fit'?'🔎 Agrandir':'🔍 Journée entière'}</button>
       <button class="btn-sec" onclick="openDispoTable()" style="font-size:12px">🗓️ Dispos</button>
       <button class="btn-sec" onclick="pickTrameAndApply()" style="font-size:12px;border-color:#FCD34D;color:#92400E">📥 Trame</button>
       ${weekOpenCount()?`<button class="btn-pri" onclick="autoFillOpen()" style="background:linear-gradient(135deg,#F59E0B,#D97706)">⚡ Pourvoir auto (${weekOpenCount()})</button>`:''}
@@ -745,6 +765,7 @@ function renderPlanning(){
     </div>
     <div class="hint" style="margin-bottom:8px">💡 <b>Créer</b>: ＋ ou clic piste &nbsp;·&nbsp; <b>Déplacer</b>: glisser centre &nbsp;· <b>Changer d'équipier</b>: glisser sur sa ligne (ou sur « À pourvoir ») &nbsp;·&nbsp; <b>Redimensionner</b>: tirer les bords &nbsp;·&nbsp; <b>Poste</b>: cliquer le badge &nbsp;·&nbsp; <b>Supprimer</b>: ×</div>
     ${buildTimeline(SEL)}`;
+  if(ZOOM==='fit'&&!renderPlanning._fix){const m=document.getElementById('tl-main');if(m&&m.scrollWidth>m.clientWidth+2&&PX>0.8){renderPlanning._fix=true;renderPlanning();renderPlanning._fix=false;return;}}
   if(savedScroll>0)requestAnimationFrame(()=>{const m=document.getElementById('tl-main'),tp=document.getElementById('tl-top');if(m)m.scrollLeft=savedScroll;if(tp)tp.scrollLeft=savedScroll;});
 }
 
@@ -762,8 +783,9 @@ function buildTimeline(dk){
     const maj=h%4===0,c=sph[i],pct=c/peak;
     const bc=c===0?'transparent':c===peak?'#0EA5E9':pct>=.7?'#38BDF8':pct>=.4?'#7DD3FC':'#BAE6FD';
     const bh=c?Math.max(3,Math.round(pct*14)):0;
-    return`<div style="position:absolute;left:${m2px(h*60)}px;top:0;bottom:0;pointer-events:none;width:${m2px((h+1)*60)-m2px(h*60)}px">
-      <span style="position:absolute;top:0;left:3px;font-size:${maj?10:9}px;color:${maj?'#475569':'#94A3B8'};font-weight:${maj?600:400};line-height:20px;white-space:nowrap">${h<24?h+'h':'0h'}</span>
+    const last=h*60>=TL_E;
+    return`<div style="position:absolute;left:${m2px(h*60)}px;top:0;bottom:0;pointer-events:none;width:${last?0:m2px((h+1)*60)-m2px(h*60)}px">
+      <span style="position:absolute;top:0;left:${last?-20:3}px;font-size:${maj?10:9}px;color:${maj?'#475569':'#94A3B8'};font-weight:${maj?600:400};line-height:20px;white-space:nowrap">${h<24?h+'h':'0h'}</span>
       <div style="position:absolute;top:20px;left:0;bottom:0;width:1px;background:${maj?'#CBD5E1':'#E2E8F0'}"></div>
       <div style="position:absolute;bottom:0;left:1px;right:0;height:${bh}px;background:${bc};border-radius:2px 2px 0 0"></div>
       ${c?`<span style="position:absolute;bottom:${bh+1}px;left:0;right:0;text-align:center;font-size:9px;font-weight:700;color:${c===peak?'#0284C7':'#64748B'};line-height:1">${c}</span>`:''}
@@ -785,24 +807,23 @@ function buildTimeline(dk){
         <div style="flex:1;background:${ps.bg||'#F8FAFC'}"></div>
       </div>`;
       pe.forEach(emp=>{
-        const shs=shifts(dk,emp.id),rh=rowH(shs.length),wh=Math.round(wkH(emp.id)*10)/10,dm=dayMin(dk,emp.id);
+        const shs=shifts(dk,emp.id),rh=rowH(shiftLanes(shs).n),wh=Math.round(wkH(emp.id)*10)/10,dm=dayMin(dk,emp.id);
         const over=wh>emp.heures,under=wh>0&&wh<emp.heures*.85,z=gi%2?'#F7FAFF':'#fff';gi++;
         const addBtn=shs.length
           ?`<button onclick="addShift('${emp.id}','${dk}')" style="width:22px;height:22px;border-radius:50%;border:1px solid #86EFAC;background:#F0FDF4;color:#16A34A;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0">＋</button>`
           :`<button onclick="createFirst('${emp.id}','${dk}')" style="width:22px;height:22px;border-radius:50%;border:1px solid #BAE6FD;background:#EFF6FF;color:#0369A1;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0">＋</button>`;
         rows+=`<div style="display:flex;height:${rh}px;border-bottom:1px solid #F1F5F9">
-          <div style="width:${EC_W}px;flex-shrink:0;height:${rh}px;padding:6px 8px;position:sticky;left:0;background:${z};z-index:5;border-right:1px solid #F1F5F9;display:flex;align-items:center;gap:5px">
+          <div style="width:${EC_W}px;flex-shrink:0;height:${rh}px;padding:6px 8px;position:sticky;left:0;background:${z};z-index:5;border-right:1px solid #F1F5F9;display:flex;align-items:center;gap:5px;overflow:hidden">
             <div style="flex:1;min-width:0">
               <div style="font-weight:600;font-size:12px;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${emp.prenom} ${emp.nom}</div>
-              <div style="font-size:10px;color:${over?'#DC2626':under?'#D97706':'#94A3B8'}">${wh}h/${emp.heures}h</div>
+              <div style="font-size:10px;color:${over?'#DC2626':under?'#D97706':'#94A3B8'};white-space:nowrap">${wh}h/${emp.heures}h${dm?` · <b style="color:#0EA5E9">${fDur(dm)}</b>`:''}</div>
               ${shs.length&&legalCheck(emp.id,dk,shs).errs.length?`<div title="${legalCheck(emp.id,dk,shs).errs.join(' · ')}" style="font-size:10px;font-weight:700;color:#DC2626">⚖️ Infraction</div>`:''}
               ${absOn(emp.id,dk)?`<div style="font-size:10px;font-weight:700;color:${absType(absOn(emp.id,dk).type).tx}">${absType(absOn(emp.id,dk).type).ico} Absent</div>`:''}
-              ${dm?`<div style="font-size:10px;color:#0EA5E9;font-weight:600">${fDur(dm)}</div>`:''}
             </div>${addBtn}
           </div>
           <div class="track" data-eid="${emp.id}" data-dk="${dk}"
             style="position:relative;width:${TL_W}px;height:${rh}px;flex-shrink:0;background-color:${z};
-              background-image:repeating-linear-gradient(90deg,transparent 0,transparent 119px,rgba(0,0,0,.04) 119px,rgba(0,0,0,.04) 120px);
+              background-image:repeating-linear-gradient(90deg,transparent 0,transparent ${60*PX-1}px,rgba(0,0,0,.05) ${60*PX-1}px,rgba(0,0,0,.05) ${60*PX}px);
               cursor:crosshair;touch-action:none">
             ${nowLine}${dispoOverlay(emp,dk)}${absOverlay(emp.id,dk)}${buildBlocks(emp,shs,dk)}
           </div>
@@ -836,13 +857,14 @@ function syncScroll(src){if(_scrollLock)return;_scrollLock=true;const t=document
 
 function buildBlocks(emp,shs,dk){
   const PS_=getPS();
+  const L=shiftLanes(shs);
   return shs.map((sh,idx)=>{
-    const w=m2px(sh.e)-m2px(sh.s),narrow=w<110,vNarrow=w<50;
+    const w=m2px(sh.e)-m2px(sh.s),narrow=w<110||BH<44,vNarrow=w<50;
     const poste=sh.poste||mainP(emp),ps=PS_[poste]||(PS_[getPostes()[0].id]||{});
     const pc=getPostes().find(p=>p.id===poste)||getPostes()[0];
     const hors=!inContract(emp,dk)||!isAvail(emp,dk,sh.s,sh.e);
     return`<div id="blk-${emp.id}-${idx}" data-blk="1" data-eid="${emp.id}" data-dk="${dk}" data-idx="${idx}"
-      style="position:absolute;left:${m2px(sh.s)}px;width:${w}px;top:${bTop(idx)}px;height:${BH}px;
+      style="position:absolute;left:${m2px(sh.s)}px;width:${w}px;top:${bTop(L.lane[idx])}px;height:${BH}px;
              background:${ps.bg||'#EFF6FF'};border:${hors?'2px dashed #DC2626':'1.5px solid '+(ps.bd||'#BFDBFE')};border-radius:8px;
              display:flex;align-items:stretch;box-shadow:0 1px 5px rgba(0,0,0,.12);z-index:2;overflow:visible;min-width:20px">
       <div data-role="left" style="position:absolute;left:0;top:0;bottom:0;width:12px;cursor:ew-resize;background:${ps.bd||'#BFDBFE'};border-radius:7px 0 0 7px;display:flex;align-items:center;justify-content:center;z-index:3"><span style="font-size:8px;color:${ps.tx||'#1E40AF'};pointer-events:none;user-select:none">⋮</span></div>

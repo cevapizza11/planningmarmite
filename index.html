@@ -121,7 +121,7 @@ button,input,select,textarea{font-family:inherit;cursor:pointer}
       <div style="font-size:9px;opacity:.7;letter-spacing:.8px">PLANIFICATION DU PERSONNEL</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
-      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.06/10/2026 21:45</div>
+      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.06/10/2026 22:00</div>
       <div id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:#FCD34D;transition:background .3s" title="Sync Firebase"></div>
     </div>
   </div>
@@ -232,6 +232,8 @@ function applyZoom(){
   }else{PX=2;BH=46;}
   TL_W=Math.round((TL_E-TL_S)*PX);
 }
+let SHOW_ALL=(()=>{try{return localStorage.getItem('pl-showall')==='1';}catch(e){return false;}})();
+function toggleShowAll(){SHOW_ALL=!SHOW_ALL;try{localStorage.setItem('pl-showall',SHOW_ALL?'1':'0');}catch(e){}renderPlanning();}
 function toggleZoom(){ZOOM=ZOOM==='fit'?'detail':'fit';try{localStorage.setItem('pl-zoom',ZOOM);}catch(e){}renderPlanning();}
 let _rzT=null;window.addEventListener('resize',()=>{clearTimeout(_rzT);_rzT=setTimeout(()=>{if(curTab==='planning'&&ZOOM==='fit'&&!DRAG)renderPlanning();},200);});
 // Créneaux qui ne se chevauchent pas → même ligne
@@ -775,7 +777,8 @@ function renderPlanning(){
 function buildTimeline(dk){
   const PS_=getPS(),grp={};
   getPostes().forEach(p=>{grp[p.id]=[];});
-  S.emps.forEach(e=>(grp[mainP(e)]||grp[getPostes()[0].id]).push(e));
+  const vis=S.emps.filter(e=>SHOW_ALL||shifts(dk,e.id).length),nHid=S.emps.length-vis.length;
+  vis.forEach(e=>(grp[mainP(e)]||grp[getPostes()[0].id]).push(e));
   const hrs=Array.from({length:19},(_,i)=>i+6);
   const sph=hrs.map(h=>S.emps.filter(e=>shifts(dk,e.id).some(sh=>sh.s<=h*60&&sh.e>h*60)).length);
   const peak=Math.max(...sph,1);
@@ -793,8 +796,11 @@ function buildTimeline(dk){
   const now=new Date(),nm=now.getHours()*60+now.getMinutes();
   const nowLine=iso(now)===dk&&nm>=TL_S&&nm<=TL_E?`<div style="position:absolute;left:${m2px(nm)}px;top:0;bottom:0;width:2px;background:#EF4444;z-index:4;pointer-events:none"><div style="position:absolute;top:3px;left:-4px;width:10px;height:10px;border-radius:50%;background:#EF4444"></div></div>`:'';
   let rows='';
-  if(!S.emps.length){
-    rows=`<div style="text-align:center;padding:40px;color:#94A3B8"><div style="font-size:32px;margin-bottom:8px">👥</div><div style="font-weight:600">Aucun employé — ajoutez-en dans l'onglet Équipe</div></div>`;
+  if(!S.emps.length||!vis.length){
+    rows=!S.emps.length?`<div style="text-align:center;padding:40px;color:#94A3B8"><div style="font-size:32px;margin-bottom:8px">👥</div><div style="font-weight:600">Aucun employé — ajoutez-en dans l'onglet Équipe</div></div>`
+      :`<div style="padding:30px 20px;color:#94A3B8;position:sticky;left:0;width:max-content;max-width:100%"><div style="font-size:28px;margin-bottom:6px">📭</div><div style="font-weight:600;color:#374151;margin-bottom:8px">Personne n'est planifié ce jour</div>
+        <div style="font-size:12px;margin-bottom:10px">Cliquez un créneau jaune « À pourvoir » pour choisir l'équipier, ou affichez tout le monde pour planifier à la main.</div>
+        <button class="btn-sec" onclick="toggleShowAll()">👁️ Afficher tout le monde</button></div>`;
   }else{
     let gi=0;
     getPostes().forEach(poste=>{
@@ -831,14 +837,18 @@ function buildTimeline(dk){
       });
     });
   }
-  rows=buildOpenRows(dk)+rows;
+  const visBar=S.emps.length&&(nHid||SHOW_ALL)?`<div style="display:flex;align-items:center;gap:8px;padding:5px 10px;background:#F8FAFC;border-bottom:1px solid #E2E8F0;font-size:11px;color:#64748B;position:sticky;left:0;width:max-content;max-width:100%">
+      ${SHOW_ALL?`👁️ Tous les équipiers affichés`:`🙈 ${nHid} équipier${nHid>1?'s':''} sans créneau ce jour masqué${nHid>1?'s':''}`}
+      <button onclick="toggleShowAll()" style="background:#fff;border:1px solid #BAE6FD;color:#0369A1;border-radius:7px;padding:3px 9px;font-size:11px;font-weight:700">${SHOW_ALL?'Masquer les non planifiés':'Afficher tout le monde'}</button>
+    </div>`:'';
+  rows=visBar+buildOpenRows(dk)+rows;
   return`<div class="tl-outer">
     <div id="tl-top" style="overflow-x:auto;overflow-y:hidden;height:14px;border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:20;background:#F8FAFC" onscroll="syncScroll('top')">
       <div style="width:${EC_W+TL_W}px;height:1px"></div>
     </div>
     <div id="tl-main" style="overflow-x:auto;-webkit-overflow-scrolling:touch" onscroll="syncScroll('main')">
       <div style="min-width:${EC_W+TL_W}px">
-        <div style="display:flex;border-bottom:2px solid #E2E8F0;background:#F8FAFC;position:sticky;top:14px;z-index:10">
+        <div style="display:flex;border-bottom:2px solid #E2E8F0;background:#F8FAFC;position:sticky;top:0;z-index:10">
           <div style="width:${EC_W}px;flex-shrink:0;padding:5px 10px;font-size:11px;font-weight:600;color:#64748B;position:sticky;left:0;background:#F8FAFC;z-index:11;border-right:1px solid #E2E8F0;display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:4px">
             <div>Employé</div><div style="font-size:9px;color:#94A3B8;font-weight:500">équipiers/h →</div>
           </div>

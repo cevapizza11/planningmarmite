@@ -121,7 +121,7 @@ button,input,select,textarea{font-family:inherit;cursor:pointer}
       <div style="font-size:9px;opacity:.7;letter-spacing:.8px">PLANIFICATION DU PERSONNEL</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
-      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.06/10/2026 09:30</div>
+      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.06/10/2026 09:50</div>
       <div id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:#FCD34D;transition:background .3s" title="Sync Firebase"></div>
     </div>
   </div>
@@ -653,13 +653,17 @@ function coord(e){
 }
 function pDown(e){
   const{x,y}=coord(e),el=document.elementFromPoint(x,y);if(!el)return;
+  const od=el.closest('[data-role="odel"]');
+  if(od){e.stopPropagation();e.preventDefault();const ob=od.closest('[data-open]');if(ob)delOpen(ob.dataset.dk,ob.dataset.open);return;}
+  const ob=el.closest('[data-open]');
+  if(ob){e.stopPropagation();e.preventDefault();DRAG={type:'open',id:ob.dataset.open,dk:ob.dataset.dk,x0:x,y0:y,el:ob,moved:false};return;}
   if(el.closest('[data-role="del"]')){e.stopPropagation();e.preventDefault();const b=el.closest('[data-blk]');if(b)delShift(b.dataset.eid,b.dataset.dk,+b.dataset.idx);return;}
   if(el.closest('[data-role="poste"]')){e.stopPropagation();DRAG={type:'poste',x0:x,y0:y,el};return;}
   const lh=el.closest('[data-role="left"]'),rh=el.closest('[data-role="right"]'),mv=el.closest('[data-role="move"]');
   const handle=lh||rh||mv;
   if(handle){const b=handle.closest('[data-blk]');if(!b)return;const sh=shifts(b.dataset.dk,b.dataset.eid)[+b.dataset.idx];if(!sh)return;
     e.stopPropagation();e.preventDefault();
-    DRAG={type:lh?'left':rh?'right':'move',eid:b.dataset.eid,dk:b.dataset.dk,idx:+b.dataset.idx,x0:x,oS:sh.s,oE:sh.e,cs:sh.s,ce:sh.e,moved:false};
+    DRAG={type:lh?'left':rh?'right':'move',eid:b.dataset.eid,dk:b.dataset.dk,idx:+b.dataset.idx,x0:x,y0:y,oS:sh.s,oE:sh.e,cs:sh.s,ce:sh.e,moved:false};
     document.body.style.cursor=mv?'grabbing':'ew-resize';return;
   }
   const tr=el.closest('.track[data-eid]');
@@ -669,13 +673,19 @@ function pMove(e){
   if(!DRAG)return;
   if(DRAG.type==='click'){const{x,y}=coord(e);if(Math.abs(x-DRAG.x0)>6||Math.abs(y-DRAG.y0)>6)DRAG=null;return;}
   if(DRAG.type==='poste')return;
+  if(DRAG.type==='open'){const{x,y}=coord(e);if(!DRAG.moved&&Math.hypot(x-DRAG.x0,y-DRAG.y0)<6)return;if(e.cancelable)e.preventDefault();e.stopPropagation();if(!DRAG.moved){DRAG.moved=true;dndStartGhost(DRAG,DRAG.el);}dndMoveGhost(DRAG,x,y);return;}
   if(e.cancelable)e.preventDefault();e.stopPropagation();
-  const{x}=coord(e),dm=(x-DRAG.x0)/PX,dur=DRAG.oE-DRAG.oS;
+  const{x,y}=coord(e),dm=(x-DRAG.x0)/PX,dur=DRAG.oE-DRAG.oS;
   let ns=DRAG.oS,ne=DRAG.oE;
   if(DRAG.type==='move'){ns=snap(clamp(DRAG.oS+dm,TL_S,TL_E-dur));ne=ns+dur;}
   else if(DRAG.type==='left'){ns=snap(clamp(DRAG.oS+dm,TL_S,DRAG.oE-MIN_D));}
   else if(DRAG.type==='right'){ne=snap(clamp(DRAG.oE+dm,DRAG.oS+MIN_D,TL_E));}
   DRAG.cs=ns;DRAG.ce=ne;DRAG.moved=true;
+  if(DRAG.type==='move'&&!DRAG.vert&&Math.abs(y-DRAG.y0)>VERT_PX){
+    const sb=document.getElementById('blk-'+DRAG.eid+'-'+DRAG.idx);
+    if(sb){sb.style.left=m2px(DRAG.oS)+'px';DRAG.vert=true;dndStartGhost(DRAG,sb);}
+  }
+  if(DRAG.vert){dndMoveGhost(DRAG,x,y);return;}
   const b=document.getElementById('blk-'+DRAG.eid+'-'+DRAG.idx);
   if(b){b.style.left=m2px(ns)+'px';b.style.width=(m2px(ne)-m2px(ns))+'px';
     const bt=b.querySelector('[data-t="bt"]');if(bt)bt.textContent=fT(ns)+'–'+fT(ne);
@@ -684,6 +694,18 @@ function pMove(e){
 function pUp(e){
   if(!DRAG)return;
   const{x,y}=coord(e),d=DRAG;DRAG=null;document.body.style.cursor='';
+  if(d.type==='open'){
+    if(!d.moved){openAssignPicker(d.dk,d.id);return;}
+    const t=dndTargetAt(x,y,d.dk);dndCleanup(d);
+    if(t&&t.type==='emp'&&absGuard(t.eid,d.dk))assignOpen(d.dk,d.id,t.eid);else renderPlanning();
+    return;
+  }
+  if(d.vert){
+    const t=dndTargetAt(x,y,d.dk);dndCleanup(d);
+    if(t&&t.type==='open'){shiftToOpen(d.dk,d.eid,d.idx,d.cs,d.ce);return;}
+    if(t&&t.type==='emp'&&t.eid!==d.eid){transferShift(d.dk,d.eid,d.idx,t.eid,d.cs,d.ce);return;}
+    if(!(t&&t.type==='emp')){renderPlanning();return;}
+  }
   if(d.type==='poste'){if(Math.abs(x-d.x0)<8&&Math.abs(y-d.y0)<8){const b=d.el.closest('[data-blk]');if(b)showPostePicker(b.dataset.eid,b.dataset.dk,+b.dataset.idx,d.el);}return;}
   if(d.type==='click'){if(Math.abs(x-d.x0)<8&&Math.abs(y-d.y0)<8){if(!absGuard(d.eid,d.dk))return;const rect=d.track.getBoundingClientRect(),cm=snap(clamp(px2m(x-rect.left),TL_S,TL_E-MIN_D));const emp=S.emps.find(e=>e.id===d.eid);if(!plGuard(d.eid,d.dk,cm,Math.min(cm+MIN_D,TL_E)))return;if(!legalGuard(d.eid,d.dk,[...shifts(d.dk,d.eid),{s:cm,e:Math.min(cm+MIN_D,TL_E)}]))return;setShifts(d.dk,d.eid,[...shifts(d.dk,d.eid),{s:cm,e:Math.min(cm+MIN_D,TL_E),poste:mainP(emp||{})}]);renderPlanning();}return;}
   if(d.moved){const arr=shifts(d.dk,d.eid);if(arr[d.idx]&&!plGuard(d.eid,d.dk,d.cs,d.ce)){renderPlanning();return;}if(arr[d.idx]&&!legalGuard(d.eid,d.dk,arr.map((x,i)=>i===d.idx?{...x,s:d.cs,e:d.ce}:x))){renderPlanning();return;}if(arr[d.idx]){arr[d.idx].s=d.cs;arr[d.idx].e=d.ce;setShifts(d.dk,d.eid,arr);renderPlanning();}}
@@ -721,7 +743,7 @@ function renderPlanning(){
       <div id="prod-badge-w">${prodBadge(SEL)}</div>
       <div id="needs-bdg" style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">${needsBadges(SEL)}</div>
     </div>
-    <div class="hint" style="margin-bottom:8px">💡 <b>Créer</b>: ＋ ou clic piste &nbsp;·&nbsp; <b>Déplacer</b>: glisser centre &nbsp;·&nbsp; <b>Redimensionner</b>: tirer les bords &nbsp;·&nbsp; <b>Poste</b>: cliquer le badge &nbsp;·&nbsp; <b>Supprimer</b>: ×</div>
+    <div class="hint" style="margin-bottom:8px">💡 <b>Créer</b>: ＋ ou clic piste &nbsp;·&nbsp; <b>Déplacer</b>: glisser centre &nbsp;· <b>Changer d'équipier</b>: glisser sur sa ligne (ou sur « À pourvoir ») &nbsp;·&nbsp; <b>Redimensionner</b>: tirer les bords &nbsp;·&nbsp; <b>Poste</b>: cliquer le badge &nbsp;·&nbsp; <b>Supprimer</b>: ×</div>
     ${buildTimeline(SEL)}`;
   if(savedScroll>0)requestAnimationFrame(()=>{const m=document.getElementById('tl-main'),tp=document.getElementById('tl-top');if(m)m.scrollLeft=savedScroll;if(tp)tp.scrollLeft=savedScroll;});
 }
@@ -824,7 +846,7 @@ function buildBlocks(emp,shs,dk){
              background:${ps.bg||'#EFF6FF'};border:${hors?'2px dashed #DC2626':'1.5px solid '+(ps.bd||'#BFDBFE')};border-radius:8px;
              display:flex;align-items:stretch;box-shadow:0 1px 5px rgba(0,0,0,.12);z-index:2;overflow:visible;min-width:20px">
       <div data-role="left" style="position:absolute;left:0;top:0;bottom:0;width:12px;cursor:ew-resize;background:${ps.bd||'#BFDBFE'};border-radius:7px 0 0 7px;display:flex;align-items:center;justify-content:center;z-index:3"><span style="font-size:8px;color:${ps.tx||'#1E40AF'};pointer-events:none;user-select:none">⋮</span></div>
-      <div data-role="move" style="flex:1;cursor:grab;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 14px;overflow:hidden;user-select:none">
+      <div data-role="move" title="Glisser à gauche/droite : changer l'heure · Glisser sur un autre équipier : lui donner le créneau" style="flex:1;cursor:grab;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 14px;overflow:hidden;user-select:none">
         ${vNarrow?`<span style="font-size:9px;color:${ps.tx||'#1E40AF'};pointer-events:none">•</span>`:
         `<span data-t="bt" style="font-size:10px;font-weight:800;color:${ps.tx||'#1E40AF'};white-space:nowrap;line-height:1.3;pointer-events:none">${fT(sh.s)}–${fT(sh.e)}</span>
          ${!narrow?`<span data-t="bd" style="font-size:9px;color:${ps.tx||'#1E40AF'};opacity:.7;pointer-events:none">${fDur(sh.e-sh.s)}</span>`:''}
@@ -2367,10 +2389,10 @@ function buildOpenRows(dk){
   if(!arr.length)return'';
   const nl=laneOf(arr),rh=rowH(nl),PS_=getPS();
   const blocks=arr.map(o=>{const ps=PS_[o.poste]||{},pc=getPostes().find(p=>p.id===o.poste)||{},w=m2px(o.e)-m2px(o.s);
-    return`<div onclick="openAssignPicker('${dk}','${o.id}')" title="Cliquer pour attribuer" style="position:absolute;left:${m2px(o.s)}px;width:${w}px;top:${bTop(o._lane)}px;height:${BH}px;border:2px dashed #F59E0B;background:repeating-linear-gradient(135deg,#FFFBEB 0,#FFFBEB 8px,#FEF3C7 8px,#FEF3C7 16px);border-radius:8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2;overflow:visible">
+    return`<div data-open="${o.id}" data-dk="${dk}" title="Cliquer pour choisir l'équipier, ou glisser sur sa ligne" style="position:absolute;left:${m2px(o.s)}px;width:${w}px;top:${bTop(o._lane)}px;height:${BH}px;border:2px dashed #F59E0B;background:repeating-linear-gradient(135deg,#FFFBEB 0,#FFFBEB 8px,#FEF3C7 8px,#FEF3C7 16px);border-radius:8px;cursor:grab;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2;overflow:visible">
       <span style="font-size:10px;font-weight:800;color:#92400E;white-space:nowrap">${fT(o.s)}–${fT(o.e)}</span>
       <span style="padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700;background:${ps.bd||'#FDE68A'};color:${ps.tx||'#92400E'};white-space:nowrap">${pc.ico||''} ${o.poste}</span>
-      <button onclick="event.stopPropagation();delOpen('${dk}','${o.id}')" style="position:absolute;top:-7px;right:-7px;width:17px;height:17px;border-radius:50%;border:1.5px solid #F59E0B;background:#fff;color:#BE123C;font-size:11px;display:flex;align-items:center;justify-content:center;padding:0">×</button>
+      <button data-role="odel" style="position:absolute;top:-7px;right:-7px;width:17px;height:17px;border-radius:50%;border:1.5px solid #F59E0B;background:#fff;color:#BE123C;font-size:11px;display:flex;align-items:center;justify-content:center;padding:0">×</button>
     </div>`;}).join('');
   return`<div class="sec-hdr" style="border-color:#FCD34D">
       <div class="sec-lbl" style="width:${EC_W}px;color:#92400E;border-color:#FCD34D;background:#FFFBEB">🟨 À pourvoir</div>
@@ -2381,7 +2403,7 @@ function buildOpenRows(dk){
         <div style="font-size:12px;font-weight:800;color:#92400E">${arr.length} créneau${arr.length>1?'x':''}</div>
         <button onclick="autoFillOpen('${dk}')" style="background:#F59E0B;color:#fff;border:none;border-radius:7px;padding:4px 6px;font-size:10px;font-weight:700">⚡ Ce jour</button>
       </div>
-      <div style="position:relative;width:${TL_W}px;height:${rh}px;flex-shrink:0;background:#FFFDF5">${blocks}</div>
+      <div data-openrow="1" data-dk="${dk}" style="position:relative;width:${TL_W}px;height:${rh}px;flex-shrink:0;background:#FFFDF5">${blocks}</div>
     </div>`;
 }
 function delOpen(dk,id){setOpen(dk,openSlots(dk).filter(o=>o.id!==id));renderPlanning();}
@@ -2523,6 +2545,66 @@ function dispoRuleCard(){
 function saveDispoRule(){
   const v=parseFloat(String(document.getElementById('dr-ratio').value).replace(',','.'));
   S.par.dispoRatio=isNaN(v)||v<1?2:v;autoSave();renderParams();
+}
+
+// ═══════════════════════════════════
+// GLISSER-DÉPOSER ENTRE ÉQUIPIERS (v37)
+// ═══════════════════════════════════
+const VERT_PX=14;
+function dndStartGhost(d,srcEl){
+  const r=srcEl.getBoundingClientRect(),g=srcEl.cloneNode(true);
+  g.removeAttribute('id');
+  g.style.cssText+=`;position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;z-index:9999;pointer-events:none;opacity:.92;box-shadow:0 8px 24px rgba(0,0,0,.28);transform:rotate(-1deg)`;
+  document.body.appendChild(g);
+  srcEl.style.opacity='.3';srcEl.style.pointerEvents='none';
+  d.ghost=g;d.src=srcEl;d.gx=r.left;d.gy=r.top;
+  document.body.style.cursor='grabbing';
+}
+function dndTargetAt(x,y,dk){
+  const el=document.elementFromPoint(x,y);if(!el)return null;
+  const tr=el.closest('.track[data-eid]');if(tr&&tr.dataset.dk===dk)return{type:'emp',el:tr,eid:tr.dataset.eid};
+  const op=el.closest('[data-openrow]');if(op&&op.dataset.dk===dk)return{type:'open',el:op};
+  return null;
+}
+function dndHighlight(d,t){
+  if(d.hl&&(!t||d.hl!==t.el)){d.hl.style.outline='';d.hl.style.background=d.hlBg||'';d.hl=null;}
+  if(t&&!d.hl){d.hl=t.el;d.hlBg=t.el.style.background;
+    const ok=t.type==='open'||t.eid!==d.eid;
+    t.el.style.outline=`2px dashed ${ok?'#0EA5E9':'#94A3B8'}`;t.el.style.outlineOffset='-2px';
+    if(ok)t.el.style.background='rgba(14,165,233,.08)';}
+}
+function dndMoveGhost(d,x,y){
+  if(!d.ghost)return;
+  d.ghost.style.left=(d.gx+(x-d.x0))+'px';d.ghost.style.top=(d.gy+(y-d.y0))+'px';
+  const bt=d.ghost.querySelector('[data-t="bt"]');if(bt&&d.cs!=null)bt.textContent=fT(d.cs)+'–'+fT(d.ce);
+  dndHighlight(d,dndTargetAt(x,y,d.dk));
+}
+function dndCleanup(d){
+  if(d.ghost)d.ghost.remove();
+  if(d.src){d.src.style.opacity='';d.src.style.pointerEvents='';}
+  dndHighlight(d,null);document.body.style.cursor='';
+}
+// Transfert d'un créneau d'un équipier à un autre
+function transferShift(dk,fromId,idx,toId,s,e){
+  const src=shifts(dk,fromId),sh=src[idx];if(!sh){renderPlanning();return;}
+  const from=S.emps.find(x=>x.id===fromId)||{},to=S.emps.find(x=>x.id===toId);if(!to){renderPlanning();return;}
+  const poste=sh.poste||mainP(from);
+  if(overlapShift(toId,dk,s,e)){alert(`${to.prenom} travaille déjà sur ce créneau horaire.`);renderPlanning();return;}
+  if(!absGuard(toId,dk)||!plGuard(toId,dk,s,e)||!legalGuard(toId,dk,[...shifts(dk,toId),{s,e}])){renderPlanning();return;}
+  const other=candInfo(to,dk,{s,e,poste}).pb.filter(p=>p==='pas sur ce poste'||p==='dépasse contrat');
+  if(other.length&&!confirm(`${to.prenom} : ${other.join(', ')} (${poste}).\nDonner quand même ce créneau ?`)){renderPlanning();return;}
+  setShifts(dk,fromId,src.filter((_,i)=>i!==idx));
+  setShifts(dk,toId,[...shifts(dk,toId),{s,e,poste}]);
+  renderPlanning();
+}
+// Remise d'un créneau dans « À pourvoir »
+function shiftToOpen(dk,fromId,idx,s,e){
+  const src=shifts(dk,fromId),sh=src[idx];if(!sh){renderPlanning();return;}
+  const from=S.emps.find(x=>x.id===fromId)||{};
+  setShifts(dk,fromId,src.filter((_,i)=>i!==idx));
+  if(!S.open)S.open={};
+  S.open[dk]=[...openSlots(dk),{id:uid(),poste:sh.poste||mainP(from),s,e}];
+  autoSave();renderPlanning();
 }
 
 // ═══════════════════════════════════

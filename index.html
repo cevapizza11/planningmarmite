@@ -123,7 +123,7 @@ button,input,select,textarea{font-family:inherit;cursor:pointer}
       <div style="font-size:9px;opacity:.7;letter-spacing:.8px">PLANIFICATION DU PERSONNEL</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
-      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.17/10/2026 19:00</div>
+      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.17/10/2026 19:20</div>
       <div id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:#FCD34D;transition:background .3s" title="Sync Firebase"></div>
     </div>
   </div>
@@ -791,6 +791,12 @@ function renderSemaineEmp(){
           ${getPostes().map(p=>`<option value="${p.id}" ${(sh.poste||mainP(emp))===p.id?'selected':''}>${p.ico||''} ${p.id}</option>`).join('')}
         </select>
         <span style="font-size:11px;color:#64748B">${fDur(sh.e-sh.s)}</span>
+        <select onchange="semEmpDonner('${dk}',${i},this.value)" title="Donner ce créneau à un autre équipier" style="padding:4px 6px;border:1px solid #C7D2FE;background:#EEF2FF;color:#3730A3;border-radius:7px;font-size:12px;font-weight:600;max-width:150px">
+          <option value="">👤 Donner à…</option>
+          <option value="__open">🟨 À pourvoir (plus tard)</option>
+          ${S.emps.filter(o=>o.id!==emp.id).map(o=>{const pb=[];if(absOn(o.id,dk))pb.push('absent');else{if(!inContract(o,dk))pb.push('hors contrat');else if(!dayAvail(o,dk))pb.push('pas dispo');if(overlapShift(o.id,dk,sh.s,sh.e))pb.push('déjà en poste');}
+            return`<option value="${o.id}">${pb.length?'⚠️':'✅'} ${o.prenom} ${o.nom}${pb.length?' ('+pb.join(', ')+')':''}</option>`;}).join('')}
+        </select>
         <button onclick="semEmpSuppr('${dk}',${i})" title="Supprimer ce créneau" style="border:1px solid #FECDD3;background:#FFF1F2;color:#BE123C;border-radius:7px;padding:3px 8px;font-size:12px">✕</button>
       </div>`).join('');
     return`<div style="padding:9px 10px;border:1px solid ${lc.errs.length?'#FECDD3':'#E2E8F0'};border-radius:10px;margin-bottom:7px;background:${isWE(d)?'#FFFBF5':'#fff'}">
@@ -820,7 +826,7 @@ function renderSemaineEmp(){
             ${wh} h planifiées / ${emp.heures} h au contrat${over?' — au-dessus du contrat':under?' — en dessous du contrat':' ✓'}
           </div>
           ${lignes}
-          <div style="font-size:10px;color:#94A3B8;margin-top:4px">Modifications enregistrées tout de suite. Mêmes contrôles que le planning : absences, disponibilités, contrat, règles légales. Heures par pas de 15 min, de 6h à minuit (00:00 en fin = minuit).</div>
+          <div style="font-size:10px;color:#94A3B8;margin-top:4px">« 👤 Donner à… » transfère le créneau (mêmes heures, même poste) à un autre équipier ou le met « À pourvoir » ; ✅ = libre ce jour, ⚠️ = absent, hors contrat, pas dispo ou déjà en poste. Modifications enregistrées tout de suite. Mêmes contrôles que le planning : absences, disponibilités, contrat, règles légales. Heures par pas de 15 min, de 6h à minuit (00:00 en fin = minuit).</div>
         </div>
         <div class="modal-foot"><button onclick="fermerSemaineEmp()" class="btn-pri">Fermer</button></div>
       </div>
@@ -837,6 +843,13 @@ function semEmpMaj(dk,idx,champ,val){
     if(!plGuard(emp.id,dk,sh.s,sh.e)||!legalGuard(emp.id,dk,arr)){renderSemaineEmp();return;}
   }
   setShifts(dk,emp.id,arr);renderPlanning();renderSemaineEmp();
+}
+function semEmpDonner(dk,idx,toId){
+  const emp=S.emps.find(e=>e.id===semEmpId);if(!emp||!toId){renderSemaineEmp();return;}
+  const sh=shifts(dk,emp.id)[idx];if(!sh){renderSemaineEmp();return;}
+  if(toId==='__open')shiftToOpen(dk,emp.id,idx,sh.s,sh.e);
+  else transferShift(dk,emp.id,idx,toId,sh.s,sh.e); // mêmes contrôles que le glisser-déposer
+  renderSemaineEmp();
 }
 function semEmpSuppr(dk,idx){
   const emp=S.emps.find(e=>e.id===semEmpId);if(!emp)return;
@@ -996,7 +1009,7 @@ function renderPlanning(){
       ${(S.fc[SEL]||{}).source==='prevision'?'<span style="font-size:10px;color:#7C3AED;font-weight:700">🔮 CA de la prévision</span>':''}
     </div>
     ${pvCarteJour(SEL)}
-    <div class="hint" style="margin-bottom:8px">💡 <b>Créer</b>: ＋ ou clic piste &nbsp;·&nbsp; <b>Déplacer</b>: glisser centre &nbsp;· <b>Changer d'équipier</b>: glisser sur sa ligne (ou sur « À pourvoir ») &nbsp;·&nbsp; <b>Redimensionner</b>: tirer les bords &nbsp;·&nbsp; <b>Poste</b>: cliquer le badge &nbsp;·&nbsp; <b>Supprimer</b>: × &nbsp;·&nbsp; <b>Semaine d'un équipier</b>: clic sur son nom</div>
+    <div class="hint" style="margin-bottom:8px">💡 <b>Créer</b>: ＋ ou clic piste &nbsp;·&nbsp; <b>Déplacer</b>: glisser centre &nbsp;· <b>Changer d'équipier</b>: glisser sur sa ligne, sur « 🟨 À pourvoir », ou « Donner à… » dans la semaine de l'équipier &nbsp;·&nbsp; <b>Redimensionner</b>: tirer les bords &nbsp;·&nbsp; <b>Poste</b>: cliquer le badge &nbsp;·&nbsp; <b>Supprimer</b>: × &nbsp;·&nbsp; <b>Semaine d'un équipier</b>: clic sur son nom</div>
     ${buildTimeline(SEL)}`;
   if(ZOOM==='fit'&&!renderPlanning._fix){const m=document.getElementById('tl-main');if(m&&m.scrollWidth>m.clientWidth+2&&PX>0.8){renderPlanning._fix=true;renderPlanning();renderPlanning._fix=false;return;}}
   if(savedScroll>0)requestAnimationFrame(()=>{const m=document.getElementById('tl-main'),tp=document.getElementById('tl-top');if(m)m.scrollLeft=savedScroll;if(tp)tp.scrollLeft=savedScroll;});
@@ -2684,7 +2697,22 @@ function clearWeekOpen(){
 function laneOf(arr){const lanes=[];arr.slice().sort((a,b)=>a.s-b.s).forEach(o=>{let l=lanes.findIndex(L=>L.every(x=>x.e<=o.s||x.s>=o.e));if(l<0){lanes.push([]);l=lanes.length-1;}lanes[l].push(o);o._lane=l;});return lanes.length;}
 function buildOpenRows(dk){
   const arr=openSlots(dk).map(o=>({...o}));
-  if(!arr.length)return'';
+  if(!arr.length){
+    // Ligne vide toujours affichée : zone de dépôt pour un créneau dont on ne sait pas encore à qui le donner
+    const rh0=rowH(1);
+    return`<div class="sec-hdr" style="border-color:#FCD34D">
+      <div class="sec-lbl" style="width:${EC_W}px;color:#92400E;border-color:#FCD34D;background:#FFFBEB">🟨 À pourvoir</div>
+      <div style="flex:1;background:#FFFBEB"></div>
+    </div>
+    <div style="display:flex;height:${rh0}px;border-bottom:2px solid #FCD34D">
+      <div style="width:${EC_W}px;flex-shrink:0;height:${rh0}px;padding:6px 8px;position:sticky;left:0;background:#FFFBEB;z-index:5;border-right:1px solid #FDE68A;display:flex;flex-direction:column;justify-content:center">
+        <div style="font-size:11px;font-weight:700;color:#B45309">Aucun créneau</div>
+      </div>
+      <div data-openrow="1" data-dk="${dk}" style="position:relative;width:${TL_W}px;height:${rh0}px;flex-shrink:0;background:#FFFDF5">
+        <div style="position:sticky;left:8px;display:inline-block;margin-top:${Math.round(rh0/2)-8}px;font-size:11px;color:#B45309;opacity:.75;pointer-events:none">⬇ Glissez ici un créneau à réattribuer plus tard</div>
+      </div>
+    </div>`;
+  }
   const nl=laneOf(arr),rh=rowH(nl),PS_=getPS();
   const blocks=arr.map(o=>{const ps=PS_[o.poste]||{},pc=getPostes().find(p=>p.id===o.poste)||{},w=m2px(o.e)-m2px(o.s);
     return`<div data-open="${o.id}" data-dk="${dk}" title="Cliquer pour choisir l'équipier, ou glisser sur sa ligne" style="position:absolute;left:${m2px(o.s)}px;width:${w}px;top:${bTop(o._lane)}px;height:${BH}px;border:2px dashed #F59E0B;background:repeating-linear-gradient(135deg,#FFFBEB 0,#FFFBEB 8px,#FEF3C7 8px,#FEF3C7 16px);border-radius:8px;cursor:grab;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2;overflow:visible">

@@ -123,7 +123,7 @@ button,input,select,textarea{font-family:inherit;cursor:pointer}
       <div style="font-size:9px;opacity:.7;letter-spacing:.8px">PLANIFICATION DU PERSONNEL</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
-      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.17/10/2026 17:10</div>
+      <div style="font-size:9px;opacity:.55;white-space:nowrap">v.17/10/2026 19:00</div>
       <div id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:#FCD34D;transition:background .3s" title="Sync Firebase"></div>
     </div>
   </div>
@@ -756,6 +756,102 @@ function addShift(eid,dk){
   if(!legalGuard(eid,dk,[...ex,{s:ns,e:ne}]))return;
   setShifts(dk,eid,[...ex,{s:ns,e:ne,poste:mainP(emp||{})}]);renderPlanning();
 }
+// ═══════════════════════════════════
+// SEMAINE D'UN ÉQUIPIER (17/10/2026)
+// Clic sur le nom d'un équipier dans le planning → sa semaine complète, jour par jour,
+// avec correction directe des créneaux (heures, poste, ajout, suppression).
+// Les mêmes contrôles que dans le planning s'appliquent : absences, disponibilités,
+// période de contrat et règles légales (Paramètres › Règles légales).
+// ═══════════════════════════════════
+let semEmpId=null;
+function m2hhmm(m){return p2(Math.floor(m/60)%24)+':'+p2(m%60);}
+function hhmm2m(v,estFin){if(!v)return null;const[h,mm]=v.split(':').map(Number);let m=h*60+mm;if(estFin&&m===0)m=24*60;return m;}
+function openSemaineEmp(eid){semEmpId=eid;renderSemaineEmp();}
+function fermerSemaineEmp(){semEmpId=null;closeModal();}
+function semEmpChangerSemaine(n){MON=addD(MON,n*7);const ds=days().map(iso);if(!ds.includes(SEL))SEL=ds[0];renderPlanning();renderSemaineEmp();}
+function semEmpVoirJour(dk){SEL=dk;fermerSemaineEmp();renderPlanning();}
+function renderSemaineEmp(){
+  const emp=S.emps.find(e=>e.id===semEmpId);if(!emp){closeModal();return;}
+  const PS_=getPS(),wh=Math.round(wkH(emp.id)*10)/10;
+  const over=wh>emp.heures,under=wh<emp.heures*.85;
+  const lignes=days().map(d=>{
+    const dk=iso(d),shs=shifts(dk,emp.id),ab=absOn(emp.id,dk),lc=shs.length?legalCheck(emp.id,dk,shs):{errs:[],warns:[]};
+    const tot=dayMin(dk,emp.id);
+    // mini-frise 6h → 24h
+    const frise=`<div style="position:relative;height:10px;background:#F1F5F9;border-radius:5px;margin:4px 0 6px">
+      ${shs.map(sh=>{const ps=PS_[sh.poste||mainP(emp)]||{};const l=(sh.s-TL_S)/(TL_E-TL_S)*100,w=(sh.e-sh.s)/(TL_E-TL_S)*100;
+        return`<div title="${fT(sh.s)}–${fT(sh.e)}" style="position:absolute;top:0;bottom:0;left:${l}%;width:${w}%;background:${ps.dot||'#0EA5E9'};border-radius:5px"></div>`;}).join('')}
+      ${[12,18].map(h=>`<div style="position:absolute;top:-2px;bottom:-2px;left:${(h*60-TL_S)/(TL_E-TL_S)*100}%;width:1px;background:#CBD5E1"></div>`).join('')}
+    </div>`;
+    const creneaux=shs.map((sh,i)=>`<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:5px">
+        <input type="time" step="900" value="${m2hhmm(sh.s)}" onchange="semEmpMaj('${dk}',${i},'s',this.value)" style="padding:4px 6px;border:1px solid #E2E8F0;border-radius:7px;font-size:13px">
+        <span style="color:#94A3B8">→</span>
+        <input type="time" step="900" value="${m2hhmm(sh.e)}" onchange="semEmpMaj('${dk}',${i},'e',this.value)" style="padding:4px 6px;border:1px solid #E2E8F0;border-radius:7px;font-size:13px">
+        <select onchange="semEmpMaj('${dk}',${i},'poste',this.value)" style="padding:4px 6px;border:1px solid #E2E8F0;border-radius:7px;font-size:12px">
+          ${getPostes().map(p=>`<option value="${p.id}" ${(sh.poste||mainP(emp))===p.id?'selected':''}>${p.ico||''} ${p.id}</option>`).join('')}
+        </select>
+        <span style="font-size:11px;color:#64748B">${fDur(sh.e-sh.s)}</span>
+        <button onclick="semEmpSuppr('${dk}',${i})" title="Supprimer ce créneau" style="border:1px solid #FECDD3;background:#FFF1F2;color:#BE123C;border-radius:7px;padding:3px 8px;font-size:12px">✕</button>
+      </div>`).join('');
+    return`<div style="padding:9px 10px;border:1px solid ${lc.errs.length?'#FECDD3':'#E2E8F0'};border-radius:10px;margin-bottom:7px;background:${isWE(d)?'#FFFBF5':'#fff'}">
+      <div class="row" style="justify-content:space-between;gap:6px;flex-wrap:wrap">
+        <button onclick="semEmpVoirJour('${dk}')" title="Ouvrir ce jour dans le planning" style="background:none;border:none;padding:0;font-weight:700;font-size:13px;color:#0F172A;text-transform:capitalize;text-decoration:underline dotted">${fDay(d)}</button>
+        <span style="font-size:12px;font-weight:700;color:${tot?'#0369A1':'#94A3B8'}">${tot?fDur(tot):'Repos'}</span>
+      </div>
+      ${ab?`<div style="font-size:11px;font-weight:700;color:${absType(ab.type).tx}">${absType(ab.type).ico} Absent(e) : ${absType(ab.type).l}</div>`:''}
+      ${shs.length?frise:''}
+      ${creneaux}
+      ${lc.errs.map(x=>`<div style="font-size:11px;color:#DC2626;font-weight:600">⚖️ ${x}</div>`).join('')}
+      ${lc.warns.map(x=>`<div style="font-size:11px;color:#D97706">⚠️ ${x}</div>`).join('')}
+      <button onclick="semEmpAjout('${dk}')" style="margin-top:3px;border:1px dashed #BAE6FD;background:#F0F9FF;color:#0369A1;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600">＋ ${shs.length?'Ajouter un créneau':'Planifier ce jour'}</button>
+    </div>`;
+  }).join('');
+  document.getElementById('modal-root').innerHTML=`
+    <div class="overlay" onclick="if(event.target===this)fermerSemaineEmp()">
+      <div class="modal" style="max-height:96vh;max-width:560px">
+        <div class="modal-hdr"><span>🗓️</span><span>${emp.prenom} ${emp.nom} — semaine</span></div>
+        <div class="modal-body" style="overflow-y:auto">
+          <div class="row" style="justify-content:space-between;gap:6px;margin-bottom:8px">
+            <button class="btn-sec" onclick="semEmpChangerSemaine(-1)" style="padding:5px 10px">‹</button>
+            <div style="font-weight:700;font-size:13px;text-align:center">${fWk(MON)}</div>
+            <button class="btn-sec" onclick="semEmpChangerSemaine(1)" style="padding:5px 10px">›</button>
+          </div>
+          <div style="padding:8px 10px;border-radius:9px;margin-bottom:10px;font-size:13px;font-weight:700;background:${over?'#FFF1F2':under?'#FFFBEB':'#F0FDF4'};color:${over?'#BE123C':under?'#92400E':'#166534'}">
+            ${wh} h planifiées / ${emp.heures} h au contrat${over?' — au-dessus du contrat':under?' — en dessous du contrat':' ✓'}
+          </div>
+          ${lignes}
+          <div style="font-size:10px;color:#94A3B8;margin-top:4px">Modifications enregistrées tout de suite. Mêmes contrôles que le planning : absences, disponibilités, contrat, règles légales. Heures par pas de 15 min, de 6h à minuit (00:00 en fin = minuit).</div>
+        </div>
+        <div class="modal-foot"><button onclick="fermerSemaineEmp()" class="btn-pri">Fermer</button></div>
+      </div>
+    </div>`;
+}
+function semEmpMaj(dk,idx,champ,val){
+  const emp=S.emps.find(e=>e.id===semEmpId);if(!emp)return;
+  const arr=shifts(dk,emp.id).map(x=>({...x})),sh=arr[idx];if(!sh)return;
+  if(champ==='poste'){sh.poste=val;}
+  else{
+    const m=hhmm2m(val,champ==='e');if(m===null){renderSemaineEmp();return;}
+    sh[champ]=clamp(snap(m),TL_S,TL_E);
+    if(sh.e-sh.s<15){alert('La fin doit être après le début.');renderSemaineEmp();return;}
+    if(!plGuard(emp.id,dk,sh.s,sh.e)||!legalGuard(emp.id,dk,arr)){renderSemaineEmp();return;}
+  }
+  setShifts(dk,emp.id,arr);renderPlanning();renderSemaineEmp();
+}
+function semEmpSuppr(dk,idx){
+  const emp=S.emps.find(e=>e.id===semEmpId);if(!emp)return;
+  setShifts(dk,emp.id,shifts(dk,emp.id).filter((_,i)=>i!==idx));renderPlanning();renderSemaineEmp();
+}
+function semEmpAjout(dk){
+  const emp=S.emps.find(e=>e.id===semEmpId);if(!emp)return;
+  if(!absGuard(emp.id,dk))return;
+  const ex=shifts(dk,emp.id);let ns,ne;
+  if(ex.length){const last=ex.reduce((a,b)=>b.e>a.e?b:a);ns=snap(Math.min(last.e+60,TL_E-MIN_D));ne=Math.min(ns+MIN_D,TL_E);}
+  else{const sl=defaultSlot(emp,dk);ns=sl.s;ne=sl.e;}
+  if(!plGuard(emp.id,dk,ns,ne))return;
+  if(!legalGuard(emp.id,dk,[...ex,{s:ns,e:ne}]))return;
+  setShifts(dk,emp.id,[...ex,{s:ns,e:ne,poste:mainP(emp)}]);renderPlanning();renderSemaineEmp();
+}
 function delShift(eid,dk,idx){setShifts(dk,eid,shifts(dk,eid).filter((_,i)=>i!==idx));renderPlanning();}
 function createFirst(eid,dk){if(!absGuard(eid,dk))return;const emp=S.emps.find(e=>e.id===eid),sl=defaultSlot(emp,dk);if(!plGuard(eid,dk,sl.s,sl.e))return;if(!legalGuard(eid,dk,[...shifts(dk,eid),{s:sl.s,e:sl.e}]))return;setShifts(dk,eid,[{s:sl.s,e:sl.e,poste:mainP(emp||{})}]);renderPlanning();}
 
@@ -900,7 +996,7 @@ function renderPlanning(){
       ${(S.fc[SEL]||{}).source==='prevision'?'<span style="font-size:10px;color:#7C3AED;font-weight:700">🔮 CA de la prévision</span>':''}
     </div>
     ${pvCarteJour(SEL)}
-    <div class="hint" style="margin-bottom:8px">💡 <b>Créer</b>: ＋ ou clic piste &nbsp;·&nbsp; <b>Déplacer</b>: glisser centre &nbsp;· <b>Changer d'équipier</b>: glisser sur sa ligne (ou sur « À pourvoir ») &nbsp;·&nbsp; <b>Redimensionner</b>: tirer les bords &nbsp;·&nbsp; <b>Poste</b>: cliquer le badge &nbsp;·&nbsp; <b>Supprimer</b>: ×</div>
+    <div class="hint" style="margin-bottom:8px">💡 <b>Créer</b>: ＋ ou clic piste &nbsp;·&nbsp; <b>Déplacer</b>: glisser centre &nbsp;· <b>Changer d'équipier</b>: glisser sur sa ligne (ou sur « À pourvoir ») &nbsp;·&nbsp; <b>Redimensionner</b>: tirer les bords &nbsp;·&nbsp; <b>Poste</b>: cliquer le badge &nbsp;·&nbsp; <b>Supprimer</b>: × &nbsp;·&nbsp; <b>Semaine d'un équipier</b>: clic sur son nom</div>
     ${buildTimeline(SEL)}`;
   if(ZOOM==='fit'&&!renderPlanning._fix){const m=document.getElementById('tl-main');if(m&&m.scrollWidth>m.clientWidth+2&&PX>0.8){renderPlanning._fix=true;renderPlanning();renderPlanning._fix=false;return;}}
   if(savedScroll>0)requestAnimationFrame(()=>{const m=document.getElementById('tl-main'),tp=document.getElementById('tl-top');if(m)m.scrollLeft=savedScroll;if(tp)tp.scrollLeft=savedScroll;});
@@ -959,7 +1055,7 @@ function buildTimeline(dk){
         rows+=`<div style="display:flex;height:${rh}px;border-bottom:1px solid #F1F5F9">
           <div style="width:${EC_W}px;flex-shrink:0;height:${rh}px;padding:6px 8px;position:sticky;left:0;background:${z};z-index:5;border-right:1px solid #F1F5F9;display:flex;align-items:center;gap:5px;overflow:hidden">
             <div style="flex:1;min-width:0">
-              <div style="font-weight:600;font-size:12px;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${emp.prenom} ${emp.nom}</div>
+              <div onclick="openSemaineEmp('${emp.id}')" title="Voir et corriger sa semaine" style="font-weight:600;font-size:12px;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;text-decoration:underline dotted #94A3B8">${emp.prenom} ${emp.nom}</div>
               <div style="font-size:10px;color:${over?'#DC2626':under?'#D97706':'#94A3B8'};white-space:nowrap">${wh}h/${emp.heures}h${dm?` · <b style="color:#0EA5E9">${fDur(dm)}</b>`:''}</div>
               ${shs.length&&legalCheck(emp.id,dk,shs).errs.length?`<div title="${legalCheck(emp.id,dk,shs).errs.join(' · ')}" style="font-size:10px;font-weight:700;color:#DC2626">⚖️ Infraction</div>`:''}
               ${absOn(emp.id,dk)?`<div style="font-size:10px;font-weight:700;color:${absType(absOn(emp.id,dk).type).tx}">${absType(absOn(emp.id,dk).type).ico} Absent</div>`:''}
